@@ -1,0 +1,119 @@
+<Window x:Class="BlindNotepad.IdDocumentEditDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="编辑证件"
+        Height="620" Width="560"
+        MinHeight="540" MinWidth="500"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        ResizeMode="CanResize"
+        FocusManager.FocusedElement="{Binding ElementName=titleBox}"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Padding="0,0,4,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="96"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Row 0: 证件名称 -->
+                <Label Grid.Row="0" Grid.Column="0" Content="证件名称(_N):" Target="{Binding ElementName=titleBox}"
+                       AutomationProperties.Name="证件名称"/>
+                <TextBox Grid.Row="0" Grid.Column="1" x:Name="titleBox" Margin="0,4"
+                         AutomationProperties.Name="证件名称输入框"/>
+
+                <!-- Row 1: 证件类型 -->
+                <Label Grid.Row="1" Grid.Column="0" Content="证件类型(_T):" Target="{Binding ElementName=docTypeBox}"
+                       AutomationProperties.Name="证件类型"/>
+                <ComboBox Grid.Row="1" Grid.Column="1" x:Name="docTypeBox" IsEditable="True" Margin="0,4"
+                          AutomationProperties.Name="证件类型选择框，可编辑"/>
+
+                <!-- Row 2: 证件号码 -->
+                <Label Grid.Row="2" Grid.Column="0" Content="证件号码(_M):" Target="{Binding ElementName=docNumberBox}"
+                       AutomationProperties.Name="证件号码"/>
+                <TextBox Grid.Row="2" Grid.Column="1" x:Name="docNumberBox" Margin="0,4"
+                         AutomationProperties.Name="证件号码输入框"/>
+
+                <!-- Row 3: 持有人 -->
+                <Label Grid.Row="3" Grid.Column="0" Content="持有人(_H):" Target="{Binding ElementName=holderNameBox}"
+                       AutomationProperties.Name="持有人"/>
+                <TextBox Grid.Row="3" Grid.Column="1" x:Name="holderNameBox" Margin="0,4"
+                         AutomationProperties.Name="持有人输入框"/>
+
+                <!-- Row 4: 签发日期 -->
+                <Label Grid.Row="4" Grid.Column="0" Content="签发日期(_I):" Target="{Binding ElementName=issueDatePicker}"
+                       AutomationProperties.Name="签发日期"/>
+                <DatePicker Grid.Row="4" Grid.Column="1" x:Name="issueDatePicker" Margin="0,4"
+                            AutomationProperties.Name="签发日期选择框"/>
+
+                <!-- Row 5: 有效期至 -->
+                <Label Grid.Row="5" Grid.Column="0" Content="有效期至(_E):" Target="{Binding ElementName=expiryDatePicker}"
+                       AutomationProperties.Name="有效期至"/>
+                <DatePicker Grid.Row="5" Grid.Column="1" x:Name="expiryDatePicker" Margin="0,4"
+                            AutomationProperties.Name="有效期至选择框"/>
+
+                <!-- Row 6: 签发机关 -->
+                <Label Grid.Row="6" Grid.Column="0" Content="签发机关(_A):" Target="{Binding ElementName=issueAuthorityBox}"
+                       AutomationProperties.Name="签发机关"/>
+                <TextBox Grid.Row="6" Grid.Column="1" x:Name="issueAuthorityBox" Margin="0,4"
+                         AutomationProperties.Name="签发机关输入框"/>
+
+                <!-- Row 7: 分类 -->
+                <Label Grid.Row="7" Grid.Column="0" Content="分类(_G):" Target="{Binding ElementName=categoryBox}"
+                       AutomationProperties.Name="分类"/>
+                <ComboBox Grid.Row="7" Grid.Column="1" x:Name="categoryBox" IsEditable="True" Margin="0,4"
+                          AutomationProperties.Name="分类选择框，可编辑"/>
+
+                <!-- Row 8: 证件图片 -->
+                <Label Grid.Row="8" Grid.Column="0" Content="证件图片(_P):"
+                       Target="{Binding ElementName=selectImageButton}"
+                       AutomationProperties.Name="证件图片"/>
+                <StackPanel Grid.Row="8" Grid.Column="1" Margin="0,4">
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="selectImageButton" Content="选择图片(_S)" Padding="10,2" Margin="0,0,8,0"
+                                Click="OnSelectImage" AutomationProperties.Name="选择证件图片"/>
+                        <Button x:Name="clearImageButton" Content="清除图片(_L)" Padding="10,2"
+                                Click="OnClearImage" AutomationProperties.Name="清除证件图片"/>
+                    </StackPanel>
+                    <TextBlock x:Name="imageFileNameText" Text="未选择" Margin="0,4,0,0"
+                               TextTrimming="CharacterEllipsis"
+                               AutomationProperties.Name="证件图片文件名"/>
+                </StackPanel>
+
+                <!-- Row 9: 备注 -->
+                <Label Grid.Row="9" Grid.Column="0" Content="备注(_R):" Target="{Binding ElementName=notesBox}"
+                       AutomationProperties.Name="备注"/>
+                <TextBox Grid.Row="9" Grid.Column="1" x:Name="notesBox" Margin="0,4"
+                         AcceptsReturn="True" TextWrapping="Wrap" Height="80"
+                         VerticalScrollBarVisibility="Auto"
+                         AutomationProperties.Name="备注输入框，可多行"/>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- Row 10: 按钮 -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button x:Name="okButton" Content="确定(_O)" Padding="20,4" Margin="0,0,8,0"
+                    Click="OnOk" AutomationProperties.Name="确定保存"/>
+            <Button Content="取消(_C)" Padding="20,4" IsCancel="True"
+                    AutomationProperties.Name="取消"/>
+        </StackPanel>
+    </Grid>
+</Window>

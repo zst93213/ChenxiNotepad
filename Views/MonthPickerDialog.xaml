@@ -1,0 +1,29 @@
+<Window x:Class="BlindNotepad.MonthPickerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="按月浏览日记"
+        Height="440" Width="440"
+        MinHeight="320" MinWidth="380"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        ResizeMode="CanResize"
+        FocusManager.FocusedElement="{Binding ElementName=monthList}"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        Loaded="Window_Loaded">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8"
+                   TextWrapping="Wrap"
+                   Text="上下光标选择月份，回车确认，Esc 取消。"
+                   AutomationProperties.Name="月份选择器说明"/>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="确定(_O)" Padding="20,4" Margin="0,0,8,0"
+                    Click="OnOk" AutomationProperties.Name="确认选择月份"/>
+            <Button Content="取消(_C)" Padding="20,4" IsCancel="True"
+                    AutomationProperties.Name="取消选择月份"/>
+        </StackPanel>
+        <ListBox x:Name="monthList"
+                 SelectionChanged="monthList_SelectionChanged"
+                 AutomationProperties.Name="月份列表"/>
+    </DockPanel>
+</Window>

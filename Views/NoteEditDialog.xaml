@@ -1,0 +1,51 @@
+<Window x:Class="BlindNotepad.NoteEditDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="编辑日记" Height="560" Width="560"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        ResizeMode="CanResize" MinHeight="500" MinWidth="500"
+        FocusManager.FocusedElement="{Binding ElementName=titleBox}"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+            <Label Content="标题(_T):" Target="{Binding ElementName=titleBox}" AutomationProperties.Name="标题标签"/>
+            <TextBox x:Name="titleBox" Width="380" AutomationProperties.Name="日记标题"/>
+        </StackPanel>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+            <Label Content="分类(_C):" Target="{Binding ElementName=categoryBox}" AutomationProperties.Name="分类标签"/>
+            <TextBox x:Name="categoryBox" Width="150" Text="默认" AutomationProperties.Name="日记分类"/>
+        </StackPanel>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
+            <Label Content="天气(_W):" Target="{Binding ElementName=weatherBox}" AutomationProperties.Name="天气标签"/>
+            <ComboBox x:Name="weatherBox" IsEditable="True" Width="120" Margin="0,0,16,0"
+                      AutomationProperties.Name="天气选择"/>
+            <Label Content="心情(_M):" Target="{Binding ElementName=moodBox}" AutomationProperties.Name="心情标签"/>
+            <ComboBox x:Name="moodBox" IsEditable="True" Width="120"
+                      AutomationProperties.Name="心情选择"/>
+        </StackPanel>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,4">
+            <Label Content="内容(_N):" AutomationProperties.Name="内容标签"/>
+            <TextBlock x:Name="charCountText" Text="0 / 10000" Margin="12,0,0,0"
+                       VerticalAlignment="Center" Opacity="0.7"
+                       AutomationProperties.Name="字数统计"/>
+        </StackPanel>
+        <TextBox Grid.Row="4" x:Name="contentBox" Margin="0,0,0,8"
+                 AcceptsReturn="True" TextWrapping="Wrap"
+                 MaxLength="10000"
+                 VerticalScrollBarVisibility="Auto"
+                 TextChanged="OnContentTextChanged"
+                 AutomationProperties.Name="日记内容，最多10000字"/>
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="okButton" Content="确定(_O)" Padding="20,4" Margin="0,0,8,0" Click="OnOk" AutomationProperties.Name="确定保存"/>
+            <Button Content="取消(_C)" Padding="20,4" IsCancel="True" AutomationProperties.Name="取消"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,29 @@
+<Window x:Class="BlindNotepad.CategoryManagerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="分类管理" Height="400" Width="480"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        ResizeMode="CanResize" MinHeight="360" MinWidth="440"
+        FocusManager.FocusedElement="{Binding ElementName=categoryList}"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Label Grid.Row="0" Content="分类列表（上下选择，Del 删除，F2 重命名）" AutomationProperties.Name="分类列表标签"/>
+        <ListBox Grid.Row="1" x:Name="categoryList" KeyDown="CategoryList_KeyDown" AutomationProperties.Name="分类列表"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBox x:Name="newCategoryBox" Width="200" AutomationProperties.Name="新分类名称输入框"/>
+            <Button Content="添加(_A)" Margin="8,0,0,0" Padding="12,4" Click="OnAdd" AutomationProperties.Name="添加分类"/>
+            <Button Content="重命名(_R)" Margin="8,0,0,0" Padding="12,4" Click="OnRename" AutomationProperties.Name="重命名分类"/>
+            <Button Content="删除(_D)" Margin="8,0,0,0" Padding="12,4" Click="OnDelete" AutomationProperties.Name="删除分类"/>
+        </StackPanel>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button x:Name="okButton" Content="确定(_O)" Padding="20,4" Margin="0,0,8,0" Click="OnOk" AutomationProperties.Name="确认"/>
+            <Button Content="取消(_C)" Padding="20,4" IsCancel="True" AutomationProperties.Name="取消"/>
+        </StackPanel>
+    </Grid>
+</Window>

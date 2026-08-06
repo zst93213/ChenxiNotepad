@@ -1,0 +1,46 @@
+<Window x:Class="BlindNotepad.SettingsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="应用设置" Height="420" Width="480"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        ResizeMode="CanResize" MinHeight="380" MinWidth="440"
+        FocusManager.FocusedElement="{Binding ElementName=autoLockBox}"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <Label Content="自动锁定超时（分钟，0 禁用）(_L)" Target="{Binding ElementName=autoLockBox}" AutomationProperties.Name="自动锁定标签"/>
+            <TextBox x:Name="autoLockBox" Width="120" AutomationProperties.Name="自动锁定分钟数"/>
+        </StackPanel>
+        <StackPanel Grid.Row="1" Margin="0,0,0,10">
+            <Label Content="密码到期提醒周期（天，0 禁用）(_E)" Target="{Binding ElementName=expiryBox}" AutomationProperties.Name="密码到期标签"/>
+            <TextBox x:Name="expiryBox" Width="120" AutomationProperties.Name="密码到期天数"/>
+        </StackPanel>
+        <StackPanel Grid.Row="2" Margin="0,0,0,10">
+            <Label Content="剪贴板自动清除秒数(_C)" Target="{Binding ElementName=clipboardBox}" AutomationProperties.Name="剪贴板清除标签"/>
+            <TextBox x:Name="clipboardBox" Width="120" AutomationProperties.Name="剪贴板清除秒数"/>
+        </StackPanel>
+        <StackPanel Grid.Row="3" Margin="0,0,0,10">
+            <Label Content="审计日志最大条数(_M)" Target="{Binding ElementName=auditMaxBox}" AutomationProperties.Name="审计日志上限标签"/>
+            <TextBox x:Name="auditMaxBox" Width="120" AutomationProperties.Name="审计日志最大条数"/>
+        </StackPanel>
+        <CheckBox Grid.Row="4" x:Name="antiScreenshotCheck" Content="启用防截屏保护" Margin="0,0,0,10" AutomationProperties.Name="防截屏保护"/>
+        <CheckBox Grid.Row="5" x:Name="auditLogCheck" Content="启用审计日志" Margin="0,0,0,10" AutomationProperties.Name="启用审计日志"/>
+        <TextBlock Grid.Row="6" TextWrapping="Wrap" Opacity="0.7"
+                   Text="防截屏：密码库解锁时屏蔽 Windows 截屏功能。审计日志：记录解锁、复制、修改等操作（仅本地存储）。"
+                   AutomationProperties.Name="设置说明"/>
+        <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="okButton" Content="确定(_O)" Padding="20,4" Margin="0,0,8,0" Click="OnOk" AutomationProperties.Name="确定保存设置"/>
+            <Button Content="取消(_C)" Padding="20,4" IsCancel="True" AutomationProperties.Name="取消"/>
+        </StackPanel>
+    </Grid>
+</Window>

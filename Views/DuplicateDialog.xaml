@@ -1,0 +1,23 @@
+<Window x:Class="BlindNotepad.DuplicateDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="重复检测" Height="500" Width="640"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        ResizeMode="CanResize" MinHeight="440" MinWidth="560"
+        FocusManager.FocusedElement="{Binding ElementName=resultBox}">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,8"
+                   Text="检测到以下重复条目。请手动在主界面中编辑或删除重复项。"
+                   AutomationProperties.Name="说明"/>
+        <TextBox Grid.Row="1" x:Name="resultBox" IsReadOnly="True" TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto" AutomationProperties.Name="重复检测结果"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="关闭(_C)" Padding="20,4" IsCancel="True" AutomationProperties.Name="关闭"/>
+        </StackPanel>
+    </Grid>
+</Window>
