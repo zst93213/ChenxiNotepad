@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using BlindNotepad.Models;
 using BlindNotepad.Services;
 
@@ -9,12 +10,15 @@ namespace BlindNotepad;
 /// <summary>
 /// 编辑笔记条目的对话框（记事本模块，不加密）。回车保存（内容框中回车换行，Ctrl+回车保存），Esc 取消。
 /// 内容最多 10000 字，实时显示字数统计。
+/// 支持自动草稿保存：每 30 秒自动保存草稿到磁盘，关闭时清除。
 /// </summary>
 public partial class SnippetEditDialog : Window
 {
     private const int MaxContentLength = 10000;
+    private const string DraftModuleKey = "snippet";
 
     private readonly SnippetEntry? _existing;
+    private readonly DispatcherTimer? _draftTimer;
 
     // 无障碍服务实例
     private readonly AccessibilityService _a11y = new();
@@ -46,6 +50,52 @@ public partial class SnippetEditDialog : Window
         }
 
         UpdateCharCount();
+
+        // 设置草稿自动保存计时器
+        _draftTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _draftTimer.Tick += OnDraftTimerTick;
+        _draftTimer.Start();
+
+        Closed += (_, _) =>
+        {
+            _draftTimer?.Stop();
+            // 保存成功时清除草稿，取消时保留草稿
+            if (Result is not null)
+                DraftService.Clear(DraftModuleKey);
+        };
+    }
+
+    /// <summary>从草稿恢复内容。</summary>
+    public void SetDraftContent(string title, string category, string content)
+    {
+        titleBox.Text = title;
+        categoryBox.Text = category;
+        contentBox.Text = content;
+        UpdateCharCount();
+    }
+
+    private void OnDraftTimerTick(object? sender, EventArgs e)
+    {
+        SaveDraftInternal();
+    }
+
+    /// <summary>自动保存草稿到磁盘。</summary>
+    private void SaveDraftInternal()
+    {
+        var title = titleBox.Text?.Trim() ?? "";
+        var content = contentBox.Text ?? "";
+        // 只在有实际内容时保存
+        if (string.IsNullOrEmpty(title) && string.IsNullOrEmpty(content)) return;
+
+        var draft = new DraftService.DraftData
+        {
+            Module = DraftModuleKey,
+            Title = title,
+            Category = categoryBox.Text?.Trim() ?? "默认",
+            Content = content,
+            IsNew = _existing is null
+        };
+        DraftService.Save(DraftModuleKey, draft);
     }
 
     /// <summary>

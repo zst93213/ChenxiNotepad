@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using BlindNotepad.Models;
 using BlindNotepad.Services;
 
@@ -11,14 +12,17 @@ namespace BlindNotepad;
 /// 内容最多 10000 字，实时显示字数统计。
 /// 新建时自动填充日期标题。编辑时光标定位到内容末尾方便续写。
 /// 支持天气和心情标签。
+/// 支持自动草稿保存：每 30 秒自动保存草稿到磁盘，关闭时清除。
 /// </summary>
 public partial class NoteEditDialog : Window
 {
     private const int MaxContentLength = 10000;
+    private const string DraftModuleKey = "note";
 
     private readonly AccessibilityService _a11y = new();
     private readonly NoteEntry? _existing;
     private readonly bool _isNew;
+    private readonly DispatcherTimer? _draftTimer;
 
     public NoteEntry? Result { get; private set; }
 
@@ -66,6 +70,54 @@ public partial class NoteEditDialog : Window
                 contentBox.ScrollToEnd();
             };
         }
+
+        // 设置草稿自动保存计时器
+        _draftTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _draftTimer.Tick += OnDraftTimerTick;
+        _draftTimer.Start();
+
+        Closed += (_, _) =>
+        {
+            _draftTimer?.Stop();
+            if (Result is not null)
+                DraftService.Clear(DraftModuleKey);
+        };
+    }
+
+    /// <summary>从草稿恢复内容。</summary>
+    public void SetDraftContent(string title, string category, string weather, string mood, string content)
+    {
+        titleBox.Text = title;
+        categoryBox.Text = category;
+        weatherBox.Text = weather;
+        moodBox.Text = mood;
+        contentBox.Text = content;
+        UpdateCharCount();
+    }
+
+    private void OnDraftTimerTick(object? sender, EventArgs e)
+    {
+        SaveDraftInternal();
+    }
+
+    /// <summary>自动保存草稿到磁盘。</summary>
+    private void SaveDraftInternal()
+    {
+        var title = titleBox.Text?.Trim() ?? "";
+        var content = contentBox.Text ?? "";
+        if (string.IsNullOrEmpty(title) && string.IsNullOrEmpty(content)) return;
+
+        var draft = new DraftService.DraftData
+        {
+            Module = DraftModuleKey,
+            Title = title,
+            Category = categoryBox.Text?.Trim() ?? "默认",
+            Weather = weatherBox.Text?.Trim() ?? "",
+            Mood = moodBox.Text?.Trim() ?? "",
+            Content = content,
+            IsNew = _isNew
+        };
+        DraftService.Save(DraftModuleKey, draft);
     }
 
     private void OnContentTextChanged(object sender, TextChangedEventArgs e)

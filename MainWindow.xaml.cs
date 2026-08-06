@@ -82,12 +82,13 @@ public partial class MainWindow : Window
         LoadUrlModule();
         SwitchToModule(Module.Url);
         SetupAutoLockTimer();
-
-        // 加载草稿
-        LoadDraft();
+        SetupDraftSaveTimer();
 
         // 日记连续记录提醒
         CheckDiaryStreak();
+
+        // 启动时静默检查更新
+        _ = CheckForUpdateAsync(silent: true);
 
         var screenReader = _a11y.IsScreenReaderRunning();
         Announce(screenReader
@@ -118,6 +119,95 @@ public partial class MainWindow : Window
         _autoLockTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
         _autoLockTimer.Tick += OnAutoLockTick;
         _autoLockTimer.Start();
+    }
+
+    // =========================================================================
+    // 草稿自动保存
+    // =========================================================================
+
+    /// <summary>设置草稿自动保存计时器，每 30 秒触发一次。</summary>
+    private void SetupDraftSaveTimer()
+    {
+        _draftSaveTimer?.Stop();
+        _draftSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _draftSaveTimer.Tick += OnDraftSaveTick;
+        _draftSaveTimer.Start();
+    }
+
+    private void OnDraftSaveTick(object? sender, EventArgs e)
+    {
+        // 草稿由编辑对话框自行管理定时保存
+        // 此计时器保留用于窗口级别的心跳检查
+    }
+
+    /// <summary>检查指定模块是否有未恢复的草稿，有则提示用户。</summary>
+    private void CheckAndOfferDraftRestore(string moduleKey)
+    {
+        if (!DraftService.Exists(moduleKey)) return;
+        var draft = DraftService.Load(moduleKey);
+        if (draft is null) return;
+
+        var moduleLabel = moduleKey switch
+        {
+            "snippet" => "记事本",
+            "note" => "日记",
+            _ => moduleKey
+        };
+
+        var timeStr = draft.SaveTime.ToString("yyyy-MM-dd HH:mm");
+        var preview = string.IsNullOrEmpty(draft.Title) ? "（无标题）" : draft.Title;
+        var result = MessageBox.Show(this,
+            $"检测到{moduleLabel}模块有未保存的草稿：\n\n" +
+            $"标题：{preview}\n" +
+            $"保存时间：{timeStr}\n\n" +
+            $"是否恢复草稿？\n（点击\"否\"将丢弃草稿）",
+            "恢复草稿", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+        if (result == MessageBoxResult.Yes)
+        {
+            // 打开编辑对话框并恢复草稿内容
+            RestoreDraftToDialog(moduleKey, draft);
+        }
+        else
+        {
+            DraftService.Clear(moduleKey);
+            Announce("草稿已丢弃。");
+        }
+    }
+
+    /// <summary>将草稿恢复到对应模块的编辑对话框。</summary>
+    private void RestoreDraftToDialog(string moduleKey, DraftService.DraftData draft)
+    {
+        if (moduleKey == "snippet")
+        {
+            var dialog = new SnippetEditDialog(null, _snippetData.Categories) { Owner = this };
+            dialog.SetDraftContent(draft.Title, draft.Category, draft.Content);
+            if (dialog.ShowDialog() == true && dialog.Result is not null)
+            {
+                var result = dialog.Result;
+                _snippetData.Entries.Add(result);
+                EnsureSnippetCategoryExists(result.Category);
+                StorageService.SaveSnippets(_snippetData);
+                RefreshTree(); RefreshList(); SelectSnippetById(result.Id);
+                Announce($"已从草稿恢复笔记：{result.Title}。");
+            }
+            DraftService.Clear(moduleKey);
+        }
+        else if (moduleKey == "note")
+        {
+            if (!EnsureUnlocked()) return;
+            var dialog = new NoteEditDialog(null) { Owner = this };
+            dialog.SetDraftContent(draft.Title, draft.Category, draft.Weather, draft.Mood, draft.Content);
+            if (dialog.ShowDialog() == true && dialog.Result is not null)
+            {
+                var result = dialog.Result;
+                _vault!.Notes.Add(result);
+                SavePasswordVault();
+                RefreshTree(); RefreshList(); SelectNoteById(result.Id);
+                Announce($"已从草稿恢复日记：{result.Title}。");
+            }
+            DraftService.Clear(moduleKey);
+        }
     }
 
     private void OnAutoLockTick(object? sender, EventArgs e)
@@ -245,6 +335,7 @@ public partial class MainWindow : Window
         if (module == Module.Url)
         {
             urlListBox.Visibility = Visibility.Visible;
+            addButton.Visibility = Visibility.Visible;
             RefreshTree();
             RefreshList();
             UpdateDetail();
@@ -254,11 +345,13 @@ public partial class MainWindow : Window
         else if (module == Module.Snippet)
         {
             snippetListBox.Visibility = Visibility.Visible;
+            addButton.Visibility = Visibility.Visible;
             RefreshTree();
             RefreshList();
             UpdateDetail();
             FocusList();
             UpdateStatus();
+            CheckAndOfferDraftRestore("snippet");
         }
         else if (module == Module.Password)
         {
@@ -266,6 +359,7 @@ public partial class MainWindow : Window
             if (_isUnlocked && _vault is not null)
             {
                 passwordListBox.Visibility = Visibility.Visible;
+                addButton.Visibility = Visibility.Visible;
                 RefreshList();
                 UpdateDetail();
                 FocusList();
@@ -282,10 +376,12 @@ public partial class MainWindow : Window
             if (_isUnlocked && _vault is not null)
             {
                 noteListBox.Visibility = Visibility.Visible;
+                addButton.Visibility = Visibility.Visible;
                 RefreshList();
                 UpdateDetail();
                 FocusList();
                 UpdateStatus();
+                CheckAndOfferDraftRestore("note");
             }
             else
             {
@@ -298,6 +394,7 @@ public partial class MainWindow : Window
             if (_isUnlocked && _vault is not null)
             {
                 idDocumentListBox.Visibility = Visibility.Visible;
+                addButton.Visibility = Visibility.Visible;
                 RefreshList();
                 UpdateDetail();
                 FocusList();
@@ -314,6 +411,7 @@ public partial class MainWindow : Window
             if (_isUnlocked && _vault is not null)
             {
                 accountingListBox.Visibility = Visibility.Visible;
+                addButton.Visibility = Visibility.Visible;
                 RefreshList();
                 UpdateDetail();
                 FocusList();
@@ -336,6 +434,7 @@ public partial class MainWindow : Window
         idDocumentListBox.Visibility = Visibility.Collapsed;
         accountingListBox.Visibility = Visibility.Collapsed;
         unlockPanel.Visibility = Visibility.Visible;
+        addButton.Visibility = Visibility.Collapsed;
 
         _firstTimeSetup = !StorageService.VaultExists();
         if (_firstTimeSetup)
@@ -1333,6 +1432,9 @@ public partial class MainWindow : Window
     private void OnExportTxt(object sender, RoutedEventArgs e) => DoExportTxt();
     private void OnInsertTemplate(object sender, RoutedEventArgs e) => DoInsertTemplate();
     private void OnBrowseByMonth(object sender, RoutedEventArgs e) => DoBrowseByMonth();
+    private void OnCheckUpdate(object sender, RoutedEventArgs e) => _ = CheckForUpdateAsync(silent: false);
+    private void OnViewChangelog(object sender, RoutedEventArgs e) => ShowChangelog();
+    private void OnAddButtonClick(object sender, RoutedEventArgs e) => DoNew();
 
     private void OnHelpShortcuts(object sender, RoutedEventArgs e)
     {
@@ -2919,5 +3021,80 @@ public partial class MainWindow : Window
     {
         if (previous is not null && previous.IsVisible) previous.Focus();
         else FocusList();
+    }
+
+    // =========================================================================
+    // 自动更新检查
+    // =========================================================================
+
+    /// <summary>检查应用更新。silent=true 时静默检查，仅在有更新时提示。</summary>
+    private async Task CheckForUpdateAsync(bool silent)
+    {
+        try
+        {
+            if (!silent)
+                Announce("正在检查更新...");
+
+            var release = await UpdateService.FetchLatestReleaseAsync(
+                UpdateService.RepoOwner, UpdateService.RepoName);
+
+            if (release is null)
+            {
+                if (!silent) Announce("无法连接更新服务器，请稍后重试。");
+                return;
+            }
+
+            var currentVer = UpdateService.CurrentVersion;
+            var hasUpdate = UpdateService.IsNewerVersion(currentVer, release.TagName);
+
+            if (!hasUpdate)
+            {
+                if (!silent) Announce($"当前已是最新版本 v{currentVer}。");
+                return;
+            }
+
+            // 有新版本
+            var body = string.IsNullOrEmpty(release.Body) ? "无详细信息" : release.Body;
+            if (body.Length > 1000) body = body[..1000] + "...";
+
+            var msg = $"发现新版本 {release.TagName}！\n\n" +
+                      $"当前版本：v{currentVer}\n" +
+                      $"发布日期：{release.PublishedAt:yyyy-MM-dd}\n\n" +
+                      $"更新内容：\n{body}\n\n" +
+                      $"是否前往下载页面？";
+
+            var result = MessageBox.Show(this, msg, "发现新版本",
+                MessageBoxButton.YesNo, MessageBoxImage.Information);
+
+            if (result == MessageBoxResult.Yes && !string.IsNullOrEmpty(release.HtmlUrl))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(release.HtmlUrl) { UseShellExecute = true });
+                    Announce("正在打开下载页面。");
+                }
+                catch { Announce("无法打开浏览器，请手动访问下载页面。"); }
+            }
+        }
+        catch
+        {
+            if (!silent) Announce("检查更新失败，请稍后重试。");
+        }
+    }
+
+    // =========================================================================
+    // 更新日志
+    // =========================================================================
+
+    /// <summary>显示更新日志对话框。</summary>
+    private void ShowChangelog()
+    {
+        var changelog = ChangelogService.GetFullChangelog();
+        var currentVer = UpdateService.CurrentVersion;
+
+        var msg = $"当前版本：v{currentVer}\n\n{changelog}";
+
+        MessageBox.Show(this, msg, "更新日志",
+            MessageBoxButton.OK, MessageBoxImage.Information);
     }
 }

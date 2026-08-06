@@ -76,6 +76,8 @@
             </MenuItem>
             <MenuItem Header="帮助(_H)" AutomationProperties.Name="帮助菜单">
                 <MenuItem Header="快捷键说明(_K)" Click="OnHelpShortcuts" AutomationProperties.Name="快捷键说明"/>
+                <MenuItem Header="检查更新(_U)" Click="OnCheckUpdate" AutomationProperties.Name="检查应用更新"/>
+                <MenuItem Header="更新日志(_L)" Click="OnViewChangelog" AutomationProperties.Name="查看更新日志"/>
                 <MenuItem Header="关于(_A)" Click="OnAbout" AutomationProperties.Name="关于本程序"/>
             </MenuItem>
         </Menu>
@@ -168,8 +170,14 @@
                             AutomationProperties.Name="清除搜索内容"/>
                 </StackPanel>
 
-                <!-- 列表区（网址/记事本/密码/日记/证件/解锁面板） -->
+                <!-- 列表区（网址/记事本/密码/日记/证件/记账/解锁面板）+ 底部添加按钮 -->
                 <Grid Grid.Row="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
                     <ListBox x:Name="urlListBox"
                              SelectionMode="Extended"
                              SelectionChanged="OnUrlSelectionChanged"
@@ -222,6 +230,12 @@
                                        AutomationProperties.Name="解锁说明"/>
                         </StackPanel>
                     </Border>
+                    </Grid>
+
+                    <!-- 底部添加按钮（各模块共享，可见性随模块切换） -->
+                    <Button x:Name="addButton" Grid.Row="1" Content="+ 添加(_A)" Margin="0,4,0,0"
+                            Padding="0,6" Click="OnAddButtonClick"
+                            AutomationProperties.Name="添加新条目按钮"/>
                 </Grid>
 
                 <GridSplitter Grid.Row="2" Height="6" HorizontalAlignment="Stretch"
