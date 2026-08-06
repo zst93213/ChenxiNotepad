@@ -49,8 +49,6 @@ public static class ShortcutConfigService
             new() { ActionName = "ExportTxt", DisplayName = "导出TXT", KeyGesture = "Ctrl+Shift+X", DefaultGesture = "Ctrl+Shift+X", Category = "通用" },
             new() { ActionName = "InsertTemplate", DisplayName = "插入模板", KeyGesture = "Ctrl+Shift+I", DefaultGesture = "Ctrl+Shift+I", Category = "记事本" },
             new() { ActionName = "BrowseByMonth", DisplayName = "按月浏览日记", KeyGesture = "Ctrl+Shift+M", DefaultGesture = "Ctrl+Shift+M", Category = "日记" },
-            new() { ActionName = "ClipboardHistory", DisplayName = "剪贴板历史", KeyGesture = "Ctrl+Shift+R", DefaultGesture = "Ctrl+Shift+R", Category = "剪贴板" },
-            new() { ActionName = "EditClipboard", DisplayName = "编辑剪贴板", KeyGesture = "Ctrl+Shift+E", DefaultGesture = "Ctrl+Shift+E", Category = "剪贴板" },
         };
     }
 

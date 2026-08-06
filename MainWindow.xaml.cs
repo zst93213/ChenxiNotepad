@@ -48,12 +48,6 @@ public partial class MainWindow : Window
     private readonly AccessibilityService _a11y = new();
     private readonly ClipboardService _clipboard = new();
 
-    // 剪贴板监控与全局热键
-    private readonly ClipboardMonitorService _clipboardMonitor = new();
-    private readonly GlobalHotkeyService _hotkeyService = new();
-    private int _clipboardHistoryHotkeyId = -1;
-    private int _clipboardEditHotkeyId = -1;
-
     // 自动锁定计时器
     private DispatcherTimer? _autoLockTimer;
     private DateTime _lastActivityTime = DateTime.Now;
@@ -88,22 +82,6 @@ public partial class MainWindow : Window
         SwitchToModule(Module.Url);
         SetupAutoLockTimer();
 
-        // 初始化剪贴板监控和全局热键
-        try
-        {
-            _clipboardMonitor.Initialize(this);
-            _clipboardMonitor.Start();
-
-            _hotkeyService.Initialize(this);
-            _clipboardHistoryHotkeyId = _hotkeyService.Register(Key.R, ctrl: true, shift: true);
-            _clipboardEditHotkeyId = _hotkeyService.Register(Key.E, ctrl: true, shift: true);
-            _hotkeyService.OnHotkeyPressed += OnGlobalHotkeyPressed;
-        }
-        catch
-        {
-            // 全局热键注册失败时静默处理，应用内快捷键仍可用
-        }
-
         // 加载草稿
         LoadDraft();
 
@@ -123,17 +101,6 @@ public partial class MainWindow : Window
         _autoLockTimer?.Stop();
         _draftSaveTimer?.Stop();
         DisableAntiScreenshot();
-
-        // 清理剪贴板监控和全局热键
-        try
-        {
-            _hotkeyService.Dispose();
-            _clipboardMonitor.Dispose();
-        }
-        catch
-        {
-            // 忽略清理异常
-        }
     }
 
     // =========================================================================
@@ -1198,8 +1165,6 @@ public partial class MainWindow : Window
     private void OnExportTxt(object sender, RoutedEventArgs e) => DoExportTxt();
     private void OnInsertTemplate(object sender, RoutedEventArgs e) => DoInsertTemplate();
     private void OnBrowseByMonth(object sender, RoutedEventArgs e) => DoBrowseByMonth();
-    private void OnShowClipboardHistory(object sender, RoutedEventArgs e) => ShowClipboardHistory();
-    private void OnEditClipboardContent(object sender, RoutedEventArgs e) => EditClipboardContent();
 
     private void OnHelpShortcuts(object sender, RoutedEventArgs e)
     {
@@ -1220,8 +1185,6 @@ public partial class MainWindow : Window
                    + "日记模块：\n  Enter 编辑  Ctrl+Shift+M 按月浏览\n"
                    + "  Ctrl+Shift+X 导出TXT\n\n"
                    + "证件模块：\n  Enter 编辑（需解锁密码库）\n\n"
-                   + "剪贴板功能（全局热键）：\n  Ctrl+Shift+R 剪贴板历史列表\n"
-                   + "  Ctrl+Shift+E 编辑最新剪贴板内容\n\n"
                    + "可在 工具→快捷键设置 中自定义快捷键。";
         MessageBox.Show(this, text, "快捷键说明", MessageBoxButton.OK, MessageBoxImage.Information);
     }
@@ -1233,7 +1196,7 @@ public partial class MainWindow : Window
             + "面向盲人用户的网址收藏、记事本、密码本、日记与证件保存应用。\n"
             + "支持纯键盘操作、争渡读屏适配、自动锁定、审计日志、\n"
             + "防截屏、备份恢复、导入、重复检测、网址健康检查、\n"
-            + "剪贴板历史、全局热键、排序导出、模板插入等。\n\n"
+            + "排序导出、模板插入、按月浏览等。\n\n"
             + "加密：AES-256-CBC + HMAC-SHA256\n"
             + "密钥派生：PBKDF2-SHA256 (600,000 iterations)",
             "关于", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -2293,62 +2256,6 @@ public partial class MainWindow : Window
         {
             _shortcuts = ShortcutConfigService.Load();
             Announce("快捷键配置已保存。");
-        }
-        RestoreFocus(previous);
-    }
-
-    // =========================================================================
-    // 剪贴板历史与全局热键
-    // =========================================================================
-
-    private void OnGlobalHotkeyPressed(int id)
-    {
-        if (id == _clipboardHistoryHotkeyId)
-        {
-            Dispatcher.BeginInvoke(new Action(ShowClipboardHistory));
-        }
-        else if (id == _clipboardEditHotkeyId)
-        {
-            Dispatcher.BeginInvoke(new Action(EditClipboardContent));
-        }
-    }
-
-    private void ShowClipboardHistory()
-    {
-        var previous = CaptureFocus();
-        var dialog = new ClipboardHistoryDialog(_clipboardMonitor) { Owner = this };
-        dialog.ShowDialog();
-        // ClipboardHistoryDialog 内部处理复制并自动关闭
-        RestoreFocus(previous);
-    }
-
-    private void EditClipboardContent()
-    {
-        var previous = CaptureFocus();
-        var dialog = new ClipboardEditDialog(null) { Owner = this };
-
-        if (dialog.ShowDialog() == true && dialog.Result is not null)
-        {
-            // 将编辑后的内容复制到剪贴板并加入历史
-            _clipboardMonitor.SuppressNext();
-            try
-            {
-                Clipboard.SetText(dialog.Result.Content);
-            }
-            catch { }
-
-            // 更新历史记录
-            if (_clipboardMonitor.History.Count > 0)
-            {
-                _clipboardMonitor.History[0].Content = dialog.Result.Content;
-                _clipboardMonitor.History[0].Timestamp = DateTime.Now;
-            }
-            else
-            {
-                _clipboardMonitor.History.Insert(0, dialog.Result);
-            }
-            _clipboardMonitor.SaveHistory();
-            Announce("已编辑并复制到剪贴板。");
         }
         RestoreFocus(previous);
     }

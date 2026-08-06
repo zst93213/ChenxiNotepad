@@ -68,9 +68,6 @@
                 <MenuItem Header="网址健康检查(_H)" Click="OnUrlHealthCheck" AutomationProperties.Name="检查网址可访问性"/>
                 <MenuItem Header="分类管理(_C)" Click="OnCategoryManager" AutomationProperties.Name="管理分类和标签"/>
                 <MenuItem Header="查看审计日志(_A)" Click="OnViewAuditLog" AutomationProperties.Name="查看操作审计日志"/>
-                <Separator/>
-                <MenuItem Header="剪贴板历史(_R)" InputGestureText="Ctrl+Shift+R" Click="OnShowClipboardHistory" AutomationProperties.Name="查看剪贴板历史列表"/>
-                <MenuItem Header="编辑剪贴板(_E)" InputGestureText="Ctrl+Shift+E" Click="OnEditClipboardContent" AutomationProperties.Name="编辑最新剪贴板内容"/>
                 <MenuItem Header="快捷键设置(_K)" Click="OnShortcutConfig" AutomationProperties.Name="自定义快捷键"/>
             </MenuItem>
             <MenuItem Header="帮助(_H)" AutomationProperties.Name="帮助菜单">
