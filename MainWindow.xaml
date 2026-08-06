@@ -46,6 +46,7 @@
                 <MenuItem Header="密码收藏(_3)" InputGestureText="Ctrl+3" Click="OnSwitchPassword" AutomationProperties.Name="切换到密码收藏"/>
                 <MenuItem Header="日记(_4)" InputGestureText="Ctrl+4" Click="OnSwitchNote" AutomationProperties.Name="切换到日记"/>
                 <MenuItem Header="证件保存(_5)" InputGestureText="Ctrl+5" Click="OnSwitchIdDocument" AutomationProperties.Name="切换到证件保存"/>
+                <MenuItem Header="记账(_6)" InputGestureText="Ctrl+6" Click="OnSwitchAccounting" AutomationProperties.Name="切换到记账"/>
                 <Separator/>
                 <MenuItem Header="切换焦点区域(_G)" InputGestureText="F6" Click="OnCycleFocus" AutomationProperties.Name="在分类树/列表/详情之间切换焦点"/>
             </MenuItem>
@@ -101,6 +102,10 @@
                          Margin="10,5" Padding="6,2"
                          Checked="OnIdDocumentModuleChecked"
                          AutomationProperties.Name="证件保存模块，按 Ctrl+5 切换"/>
+            <RadioButton x:Name="accountingModuleRadio" Content="记账" GroupName="Module"
+                         Margin="10,5" Padding="6,2"
+                         Checked="OnAccountingModuleChecked"
+                         AutomationProperties.Name="记账模块，按 Ctrl+6 切换"/>
         </StackPanel>
 
         <!-- 底部状态栏 -->
@@ -115,7 +120,7 @@
                        Text="就绪" VerticalAlignment="Center" Margin="8,0"
                        AutomationProperties.Name="当前位置"/>
             <TextBlock Grid.Column="1" x:Name="statusHintText"
-                       Text="Ctrl+1 网址 Ctrl+2 记事本 Ctrl+3 密码 Ctrl+4 日记 Ctrl+5 证件 F6 切换区域"
+                       Text="Ctrl+1 网址 Ctrl+2 记事本 Ctrl+3 密码 Ctrl+4 日记 Ctrl+5 证件 Ctrl+6 记账 F6 切换区域"
                        VerticalAlignment="Center" Margin="12,0"
                        AutomationProperties.Name="快捷键提示"/>
             <TextBlock Grid.Column="2" x:Name="statusMessageText"
@@ -189,6 +194,11 @@
                              SelectionChanged="OnIdDocumentSelectionChanged"
                              MouseDoubleClick="OnIdDocumentDoubleClick"
                              AutomationProperties.Name="证件列表"/>
+                    <ListBox x:Name="accountingListBox" Visibility="Collapsed"
+                             SelectionMode="Extended"
+                             SelectionChanged="OnAccountingSelectionChanged"
+                             MouseDoubleClick="OnAccountingDoubleClick"
+                             AutomationProperties.Name="记账列表"/>
                     <Border x:Name="unlockPanel" Visibility="Collapsed"
                             BorderBrush="#FFB0B0B0" BorderThickness="1" Background="#FFFAFAFA"
                             Padding="20"

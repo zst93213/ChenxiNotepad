@@ -19,7 +19,7 @@ namespace BlindNotepad;
 /// </summary>
 public partial class MainWindow : Window
 {
-    private enum Module { Url, Snippet, Password, Note, IdDocument }
+    private enum Module { Url, Snippet, Password, Note, IdDocument, Accounting }
 
     private Module _currentModule = Module.Url;
     private bool _isLoaded;
@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     private List<NoteEntry> _filteredNotes = new();
     private List<SnippetEntry> _filteredSnippets = new();
     private List<IdDocumentEntry> _filteredIdDocuments = new();
+    private List<AccountingEntry> _filteredAccountings = new();
     private SnippetCollectionData _snippetData = new();
 
     // 无障碍与剪贴板服务
@@ -223,6 +224,11 @@ public partial class MainWindow : Window
         if (_isLoaded) SwitchToModule(Module.IdDocument);
     }
 
+    private void OnAccountingModuleChecked(object sender, RoutedEventArgs e)
+    {
+        if (_isLoaded) SwitchToModule(Module.Accounting);
+    }
+
     private void SwitchToModule(Module module)
     {
         _currentModule = module;
@@ -232,6 +238,7 @@ public partial class MainWindow : Window
         passwordListBox.Visibility = Visibility.Collapsed;
         noteListBox.Visibility = Visibility.Collapsed;
         idDocumentListBox.Visibility = Visibility.Collapsed;
+        accountingListBox.Visibility = Visibility.Collapsed;
         unlockPanel.Visibility = Visibility.Collapsed;
         masterPasswordConfirmBox.Visibility = Visibility.Collapsed;
 
@@ -285,7 +292,7 @@ public partial class MainWindow : Window
                 ShowUnlockPanel();
             }
         }
-        else // IdDocument
+        else if (module == Module.IdDocument)
         {
             RefreshTree();
             if (_isUnlocked && _vault is not null)
@@ -301,6 +308,23 @@ public partial class MainWindow : Window
                 ShowUnlockPanel();
             }
         }
+        else // Accounting
+        {
+            RefreshTree();
+            if (_isUnlocked && _vault is not null)
+            {
+                accountingListBox.Visibility = Visibility.Visible;
+                RefreshList();
+                UpdateDetail();
+                FocusList();
+                UpdateStatus();
+                AnnounceMonthlySummary();
+            }
+            else
+            {
+                ShowUnlockPanel();
+            }
+        }
 
         ResetActivityTimer();
     }
@@ -310,6 +334,7 @@ public partial class MainWindow : Window
         passwordListBox.Visibility = Visibility.Collapsed;
         noteListBox.Visibility = Visibility.Collapsed;
         idDocumentListBox.Visibility = Visibility.Collapsed;
+        accountingListBox.Visibility = Visibility.Collapsed;
         unlockPanel.Visibility = Visibility.Visible;
 
         _firstTimeSetup = !StorageService.VaultExists();
@@ -493,7 +518,7 @@ public partial class MainWindow : Window
             foreach (var cat in cats.OrderBy(c => c))
                 categoryTree.Items.Add(MakeTreeNode(cat, cat));
         }
-        else // IdDocument
+        else if (_currentModule == Module.IdDocument)
         {
             categoryTree.Items.Add(MakeTreeNode("全部证件", null));
             var cats = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -503,6 +528,22 @@ public partial class MainWindow : Window
                 {
                     if (!string.IsNullOrWhiteSpace(doc.Category))
                         cats.Add(doc.Category);
+                }
+            }
+            foreach (var cat in cats.OrderBy(c => c))
+                categoryTree.Items.Add(MakeTreeNode(cat, cat));
+        }
+        else if (_currentModule == Module.Accounting)
+        {
+            categoryTree.Items.Clear();
+            categoryTree.Items.Add(MakeTreeNode("全部账目", null));
+            var cats = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (_vault is not null)
+            {
+                foreach (var acc in _vault.Accountings)
+                {
+                    if (!string.IsNullOrWhiteSpace(acc.Category))
+                        cats.Add(acc.Category);
                 }
             }
             foreach (var cat in cats.OrderBy(c => c))
@@ -631,7 +672,7 @@ public partial class MainWindow : Window
             if (noteListBox.Items.Count > 0) noteListBox.SelectedIndex = 0;
             else UpdateDetailForEmpty();
         }
-        else // IdDocument
+        else if (_currentModule == Module.IdDocument)
         {
             idDocumentListBox.Items.Clear();
             _filteredIdDocuments = (_vault?.IdDocuments ?? new List<IdDocumentEntry>())
@@ -653,6 +694,32 @@ public partial class MainWindow : Window
             }
 
             if (idDocumentListBox.Items.Count > 0) idDocumentListBox.SelectedIndex = 0;
+            else UpdateDetailForEmpty();
+        }
+        else if (_currentModule == Module.Accounting)
+        {
+            accountingListBox.Items.Clear();
+            _filteredAccountings = (_vault?.Accountings ?? new List<AccountingEntry>())
+                .Where(a => _currentFilter is null || a.Category == _currentFilter)
+                .Where(a => string.IsNullOrEmpty(search)
+                            || a.Title.Contains(search, StringComparison.OrdinalIgnoreCase)
+                            || a.Category.Contains(search, StringComparison.OrdinalIgnoreCase)
+                            || a.Note.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            _filteredAccountings = SortEntries(_filteredAccountings, a => a.IsFavorite, a => a.Title, a => a.Date, a => a.ModifiedTime);
+
+            foreach (var entry in _filteredAccountings)
+            {
+                var prefix = entry.IsFavorite ? "★ " : "";
+                var typeIcon = entry.IsIncome ? "[收]" : "[支]";
+                var display = $"{prefix}{typeIcon} ¥{entry.Amount:F2} {entry.Category} - {entry.Title}";
+                var item = new ListBoxItem { Content = display, Tag = entry };
+                AutomationProperties.SetName(item, $"{(entry.IsFavorite ? "收藏 " : "")}{entry.Type} {entry.Amount:F2}元 {entry.Category} {entry.Title} {entry.Date:yyyy-MM-dd}");
+                item.ContextMenu = BuildAccountingContextMenu();
+                accountingListBox.Items.Add(item);
+            }
+
+            if (accountingListBox.Items.Count > 0) accountingListBox.SelectedIndex = 0;
             else UpdateDetailForEmpty();
         }
 
@@ -732,6 +799,7 @@ public partial class MainWindow : Window
     private PasswordEntry? GetSelectedPassword() => (passwordListBox.SelectedItem as ListBoxItem)?.Tag as PasswordEntry;
     private NoteEntry? GetSelectedNote() => (noteListBox.SelectedItem as ListBoxItem)?.Tag as NoteEntry;
     private IdDocumentEntry? GetSelectedIdDocument() => (idDocumentListBox.SelectedItem as ListBoxItem)?.Tag as IdDocumentEntry;
+    private AccountingEntry? GetSelectedAccounting() => (accountingListBox.SelectedItem as ListBoxItem)?.Tag as AccountingEntry;
 
     private void OnUrlSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -758,10 +826,16 @@ public partial class MainWindow : Window
         if (_currentModule == Module.IdDocument) { UpdateDetail(); UpdateStatus(); }
     }
 
+    private void OnAccountingSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_currentModule == Module.Accounting) { UpdateDetail(); UpdateStatus(); }
+    }
+
     private void OnUrlDoubleClick(object sender, MouseButtonEventArgs e) => DoOpenUrl();
     private void OnSnippetDoubleClick(object sender, MouseButtonEventArgs e) => DoEdit();
     private void OnNoteDoubleClick(object sender, MouseButtonEventArgs e) => DoEdit();
     private void OnIdDocumentDoubleClick(object sender, MouseButtonEventArgs e) => DoEdit();
+    private void OnAccountingDoubleClick(object sender, MouseButtonEventArgs e) => DoEdit();
 
     private void UpdateDetail()
     {
@@ -772,13 +846,14 @@ public partial class MainWindow : Window
             Module.Password => GetSelectedPassword() is { } pwd ? BuildPasswordDetail(pwd) : "（未选中密码条目）",
             Module.Note => GetSelectedNote() is { } note ? BuildNoteDetail(note) : "（未选中日记）",
             Module.IdDocument => GetSelectedIdDocument() is { } doc ? BuildIdDocumentDetail(doc) : "（未选中证件）",
+            Module.Accounting => GetSelectedAccounting() is { } acc ? BuildAccountingDetail(acc) : "（未选中账目）",
             _ => ""
         };
     }
 
     private void UpdateDetailForEmpty()
     {
-        var needUnlock = (_currentModule == Module.Password || _currentModule == Module.Note || _currentModule == Module.IdDocument) && !_isUnlocked;
+        var needUnlock = (_currentModule == Module.Password || _currentModule == Module.Note || _currentModule == Module.IdDocument || _currentModule == Module.Accounting) && !_isUnlocked;
         detailText.Text = needUnlock
             ? "（密码库未解锁，请输入主密码）"
             : "（当前没有条目，按 Ctrl+N 新建）\n\n提示：右键列表项可打开上下文菜单";
@@ -891,6 +966,67 @@ public partial class MainWindow : Window
                + $"备注：{entry.Notes}";
     }
 
+    private string BuildAccountingDetail(AccountingEntry entry)
+    {
+        var monthlySummary = GetMonthlySummary(entry.Date);
+
+        return $"说明：{entry.Title}\n"
+               + $"类型：{entry.Type}\n"
+               + $"金额：¥{entry.Amount:F2}\n"
+               + $"分类：{entry.Category}\n"
+               + $"支付方式：{entry.PaymentMethod}\n"
+               + $"日期：{entry.Date:yyyy-MM-dd}\n"
+               + $"收藏：{(entry.IsFavorite ? "是" : "否")}\n"
+               + $"创建时间：{entry.CreatedTime:yyyy-MM-dd HH:mm}\n"
+               + $"修改时间：{entry.ModifiedTime:yyyy-MM-dd HH:mm}\n"
+               + $"备注：{entry.Note}\n\n"
+               + $"{monthlySummary}\n\n"
+               + "提示：Enter 编辑 | Del 删除 | F2 编辑 | Ctrl+Shift+S 播报统计 | Ctrl+Shift+F 收藏";
+    }
+
+    /// <summary>计算指定月份的收支汇总文本。</summary>
+    private string GetMonthlySummary(DateTime monthDate)
+    {
+        if (_vault is null) return "";
+
+        var monthAccountings = _vault.Accountings
+            .Where(a => a.Date.Year == monthDate.Year && a.Date.Month == monthDate.Month)
+            .ToList();
+
+        var income = monthAccountings.Where(a => a.IsIncome).Sum(a => a.Amount);
+        var expense = monthAccountings.Where(a => !a.IsIncome).Sum(a => a.Amount);
+        var balance = income - expense;
+
+        return $"{monthDate:yyyy年MM月}统计：收入 ¥{income:F2}，支出 ¥{expense:F2}，结余 ¥{balance:F2}（共 {monthAccountings.Count} 笔）";
+    }
+
+    /// <summary>语音播报当月收支统计。</summary>
+    private void AnnounceMonthlySummary()
+    {
+        if (_vault is null || _vault.Accountings.Count == 0)
+        {
+            Announce("暂无记账数据。");
+            return;
+        }
+
+        var now = DateTime.Now;
+        var monthAccountings = _vault.Accountings
+            .Where(a => a.Date.Year == now.Year && a.Date.Month == now.Month)
+            .ToList();
+
+        if (monthAccountings.Count == 0)
+        {
+            Announce($"{now:yyyy年MM月}暂无记账记录。");
+            return;
+        }
+
+        var income = monthAccountings.Where(a => a.IsIncome).Sum(a => a.Amount);
+        var expense = monthAccountings.Where(a => !a.IsIncome).Sum(a => a.Amount);
+        var balance = income - expense;
+
+        Announce($"{now:yyyy年MM月}统计：共 {monthAccountings.Count} 笔，收入 {income:F2} 元，支出 {expense:F2} 元，结余 {balance:F2} 元。");
+    }
+
     // =========================================================================
     // 状态栏与播报
     // =========================================================================
@@ -904,10 +1040,11 @@ public partial class MainWindow : Window
             Module.Password => "密码收藏",
             Module.Note => "日记",
             Module.IdDocument => "证件保存",
+            Module.Accounting => "记账",
             _ => ""
         };
 
-        if ((_currentModule == Module.Password || _currentModule == Module.Note || _currentModule == Module.IdDocument) && !_isUnlocked)
+        if ((_currentModule == Module.Password || _currentModule == Module.Note || _currentModule == Module.IdDocument || _currentModule == Module.Accounting) && !_isUnlocked)
         {
             statusPositionText.Text = $"{moduleText} | 未解锁";
             statusHintText.Text = "输入主密码后按回车解锁";
@@ -922,6 +1059,7 @@ public partial class MainWindow : Window
             Module.Password => _filteredPasswords.Count,
             Module.Note => _filteredNotes.Count,
             Module.IdDocument => _filteredIdDocuments.Count,
+            Module.Accounting => _filteredAccountings.Count,
             _ => 0
         };
         var index = _currentModule switch
@@ -931,6 +1069,7 @@ public partial class MainWindow : Window
             Module.Password => passwordListBox.SelectedIndex,
             Module.Note => noteListBox.SelectedIndex,
             Module.IdDocument => idDocumentListBox.SelectedIndex,
+            Module.Accounting => accountingListBox.SelectedIndex,
             _ => 0
         };
         statusPositionText.Text = count == 0
@@ -943,6 +1082,7 @@ public partial class MainWindow : Window
             Module.Snippet => "Enter 编辑 Ctrl+Shift+C 复制内容 Ctrl+Shift+I 模板 Del 删除 F2 编辑 Ctrl+Shift+O 排序 Ctrl+Shift+X 导出",
             Module.Password => "Ctrl+Shift+C 复制密码 Del 删除 F2 编辑 Ctrl+Shift+L 锁定",
             Module.Note => "Enter 编辑 Ctrl+Shift+M 按月浏览 Del 删除 F2 编辑 Ctrl+Shift+F 收藏 Ctrl+Shift+X 导出",
+            Module.Accounting => "Enter 编辑 Ctrl+Shift+S 播报统计 Del 删除 F2 编辑 Ctrl+Shift+F 收藏 Ctrl+Shift+O 排序",
             _ => ""
         };
     }
@@ -971,6 +1111,7 @@ public partial class MainWindow : Window
         if (ctrl && !shift && e.Key == Key.D3) { e.Handled = true; passwordModuleRadio.IsChecked = true; return; }
         if (ctrl && !shift && e.Key == Key.D4) { e.Handled = true; noteModuleRadio.IsChecked = true; return; }
         if (ctrl && !shift && e.Key == Key.D5) { e.Handled = true; idDocumentModuleRadio.IsChecked = true; return; }
+        if (ctrl && !shift && e.Key == Key.D6) { e.Handled = true; accountingModuleRadio.IsChecked = true; return; }
 
         // F6 切换焦点区域
         if (e.Key == Key.F6 && !ctrl && !shift) { e.Handled = true; CycleFocus(); return; }
@@ -1080,6 +1221,22 @@ public partial class MainWindow : Window
             return;
         }
 
+        // 记账模块：Ctrl+Shift+S 播报当月统计
+        if (_currentModule == Module.Accounting && ctrl && shift && e.Key == Key.S)
+        {
+            e.Handled = true;
+            AnnounceMonthlySummary();
+            return;
+        }
+
+        // 记账列表：Enter 编辑
+        if (_currentModule == Module.Accounting && accountingListBox.IsKeyboardFocusWithin && e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            DoEdit();
+            return;
+        }
+
         // Esc 清除搜索
         if (e.Key == Key.Escape && !string.IsNullOrEmpty(searchBox.Text))
         {
@@ -1114,7 +1271,8 @@ public partial class MainWindow : Window
                || (_currentModule == Module.Snippet && snippetListBox.IsKeyboardFocusWithin)
                || (_currentModule == Module.Password && passwordListBox.IsKeyboardFocusWithin)
                || (_currentModule == Module.Note && noteListBox.IsKeyboardFocusWithin)
-               || (_currentModule == Module.IdDocument && idDocumentListBox.IsKeyboardFocusWithin);
+               || (_currentModule == Module.IdDocument && idDocumentListBox.IsKeyboardFocusWithin)
+               || (_currentModule == Module.Accounting && accountingListBox.IsKeyboardFocusWithin);
     }
 
     private void FocusList()
@@ -1124,7 +1282,8 @@ public partial class MainWindow : Window
         else if (_currentModule == Module.Password && _isUnlocked) passwordListBox.Focus();
         else if (_currentModule == Module.Note && _isUnlocked) noteListBox.Focus();
         else if (_currentModule == Module.IdDocument && _isUnlocked) idDocumentListBox.Focus();
-        else if ((_currentModule == Module.Password || _currentModule == Module.Note || _currentModule == Module.IdDocument) && unlockPanel.Visibility == Visibility.Visible)
+        else if (_currentModule == Module.Accounting && _isUnlocked) accountingListBox.Focus();
+        else if ((_currentModule == Module.Password || _currentModule == Module.Note || _currentModule == Module.IdDocument || _currentModule == Module.Accounting) && unlockPanel.Visibility == Visibility.Visible)
             masterPasswordBox.Focus();
     }
 
@@ -1143,6 +1302,7 @@ public partial class MainWindow : Window
     private void OnSwitchPassword(object sender, RoutedEventArgs e) => passwordModuleRadio.IsChecked = true;
     private void OnSwitchNote(object sender, RoutedEventArgs e) => noteModuleRadio.IsChecked = true;
     private void OnSwitchIdDocument(object sender, RoutedEventArgs e) => idDocumentModuleRadio.IsChecked = true;
+    private void OnSwitchAccounting(object sender, RoutedEventArgs e) => accountingModuleRadio.IsChecked = true;
     private void OnCopySnippet(object sender, RoutedEventArgs e) => DoCopySnippet();
     private void OnCycleFocus(object sender, RoutedEventArgs e) => CycleFocus();
     private void OnOpenUrl(object sender, RoutedEventArgs e) => DoOpenUrl();
@@ -1177,7 +1337,7 @@ public partial class MainWindow : Window
     private void OnHelpShortcuts(object sender, RoutedEventArgs e)
     {
         var text = "快捷键说明：\n\n"
-                   + "Ctrl+1 网址 / Ctrl+2 记事本 / Ctrl+3 密码 / Ctrl+4 日记 / Ctrl+5 证件\n"
+                   + "Ctrl+1 网址 / Ctrl+2 记事本 / Ctrl+3 密码 / Ctrl+4 日记 / Ctrl+5 证件 / Ctrl+6 记账\n"
                    + "F6  在分类树/列表/详情间切换焦点\n"
                    + "Ctrl+N 新建  Ctrl+E 或 F2 编辑  Ctrl+D 或 Del 删除\n"
                    + "Ctrl+F 搜索  Ctrl+S 保存  Esc 清除搜索\n"
@@ -1193,6 +1353,8 @@ public partial class MainWindow : Window
                    + "日记模块：\n  Enter 编辑  Ctrl+Shift+M 按月浏览\n"
                    + "  Ctrl+Shift+X 导出TXT\n\n"
                    + "证件模块：\n  Enter 编辑（需解锁密码库）\n\n"
+                   + "记账模块：\n  Enter 编辑  Ctrl+Shift+S 播报当月统计\n"
+                   + "  （需解锁密码库）\n\n"
                    + "可在 工具→快捷键设置 中自定义快捷键。";
         MessageBox.Show(this, text, "快捷键说明", MessageBoxButton.OK, MessageBoxImage.Information);
     }
@@ -1200,8 +1362,8 @@ public partial class MainWindow : Window
     private void OnAbout(object sender, RoutedEventArgs e)
     {
         MessageBox.Show(this,
-            "BlindNotepad 盲人记事本 v1.3\n\n"
-            + "面向盲人用户的网址收藏、记事本、密码本、日记与证件保存应用。\n"
+            "BlindNotepad 盲人记事本 v1.4\n\n"
+            + "面向盲人用户的网址收藏、记事本、密码本、日记、证件保存与记账应用。\n"
             + "支持纯键盘操作、争渡读屏适配、自动锁定、审计日志、\n"
             + "防截屏、备份恢复、导入、重复检测、网址健康检查、\n"
             + "排序导出、模板插入、按月浏览等。\n\n"
@@ -1259,6 +1421,7 @@ public partial class MainWindow : Window
     private bool EnsureUnlocked()
     {
         if (_currentModule == Module.Url || _currentModule == Module.Snippet) return true;
+        if (_currentModule == Module.Accounting && _isUnlocked) return true;
         if (!_isUnlocked) { Announce("请先解锁密码库。"); return false; }
         return true;
     }
@@ -1270,6 +1433,7 @@ public partial class MainWindow : Window
         else if (_currentModule == Module.Password && EnsureUnlocked()) NewPassword();
         else if (_currentModule == Module.Note && EnsureUnlocked()) NewNote();
         else if (_currentModule == Module.IdDocument && EnsureUnlocked()) NewIdDocument();
+        else if (_currentModule == Module.Accounting && EnsureUnlocked()) NewAccounting();
     }
 
     private void DoEdit()
@@ -1279,6 +1443,7 @@ public partial class MainWindow : Window
         else if (_currentModule == Module.Password && EnsureUnlocked()) EditPassword();
         else if (_currentModule == Module.Note && EnsureUnlocked()) EditNote();
         else if (_currentModule == Module.IdDocument && EnsureUnlocked()) EditIdDocument();
+        else if (_currentModule == Module.Accounting && EnsureUnlocked()) EditAccounting();
     }
 
     private void DoDelete()
@@ -1288,6 +1453,7 @@ public partial class MainWindow : Window
         else if (_currentModule == Module.Password && EnsureUnlocked()) DeletePassword();
         else if (_currentModule == Module.Note && EnsureUnlocked()) DeleteNote();
         else if (_currentModule == Module.IdDocument && EnsureUnlocked()) DeleteIdDocument();
+        else if (_currentModule == Module.Accounting && EnsureUnlocked()) DeleteAccounting();
     }
 
     // ---- 网址增删改 ----
@@ -1525,6 +1691,71 @@ public partial class MainWindow : Window
         }
     }
 
+    // ---- 记账增删改 ----
+
+    private void NewAccounting()
+    {
+        var previous = CaptureFocus();
+        var dialog = new AccountingEditDialog(null) { Owner = this };
+
+        if (dialog.ShowDialog() == true && dialog.Result is not null)
+        {
+            var result = dialog.Result;
+            _vault!.Accountings.Add(result);
+            SavePasswordVault();
+            RefreshTree(); RefreshList(); SelectAccountingById(result.Id);
+            Announce($"已新建{result.Type}：{result.Title}，{result.Amount:F2}元。");
+        }
+        else Announce("已取消新建。");
+        RestoreFocus(previous);
+    }
+
+    private void EditAccounting()
+    {
+        var entry = GetSelectedAccounting();
+        if (entry is null) { Announce("请先选中要编辑的账目。"); return; }
+
+        var previous = CaptureFocus();
+        var dialog = new AccountingEditDialog(entry) { Owner = this };
+
+        if (dialog.ShowDialog() == true && dialog.Result is not null)
+        {
+            var result = dialog.Result;
+            var index = _vault!.Accountings.IndexOf(entry);
+            if (index >= 0) _vault.Accountings[index] = result;
+            SavePasswordVault();
+            RefreshTree(); RefreshList(); SelectAccountingById(result.Id);
+            Announce($"已更新{result.Type}：{result.Title}，{result.Amount:F2}元。");
+        }
+        else Announce("已取消编辑。");
+        RestoreFocus(previous);
+    }
+
+    private void DeleteAccounting()
+    {
+        var entry = GetSelectedAccounting();
+        if (entry is null) { Announce("请先选中要删除的账目。"); return; }
+
+        if (ConfirmDelete($"确认删除账目\"{entry.Title}\"（{entry.Amount:F2}元）吗？"))
+        {
+            _vault!.Accountings.Remove(entry);
+            SavePasswordVault();
+            RefreshTree(); RefreshList();
+            Announce($"已删除账目：{entry.Title}。");
+        }
+        else Announce("已取消删除。");
+    }
+
+    private void SelectAccountingById(string id)
+    {
+        for (var i = 0; i < accountingListBox.Items.Count; i++)
+        {
+            if (accountingListBox.Items[i] is ListBoxItem item && item.Tag is AccountingEntry a && a.Id == id)
+            { accountingListBox.SelectedIndex = i; accountingListBox.Focus(); return; }
+        }
+        if (accountingListBox.Items.Count > 0) { accountingListBox.SelectedIndex = 0; accountingListBox.Focus(); }
+    }
+
     private void DoCopyDocNumber()
     {
         var entry = GetSelectedIdDocument();
@@ -1555,6 +1786,18 @@ public partial class MainWindow : Window
         menu.Items.Add(MakeMenuItem("复制证件号码", "复制证件号码到剪贴板", (s, e) => DoCopyDocNumber()));
         menu.Items.Add(new Separator());
         menu.Items.Add(MakeMenuItem("删除", "删除证件", (s, e) => DoDelete(), "Del"));
+        return menu;
+    }
+
+    private ContextMenu BuildAccountingContextMenu()
+    {
+        var menu = new ContextMenu();
+        menu.Items.Add(MakeMenuItem("编辑", "编辑账目", (s, e) => DoEdit(), "F2"));
+        menu.Items.Add(MakeMenuItem("播报当月统计", "播报当月收支统计", (s, e) => AnnounceMonthlySummary(), "Ctrl+Shift+S"));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(MakeMenuItem("切换收藏", "切换收藏置顶", (s, e) => DoToggleFavorite(), "Ctrl+Shift+F"));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(MakeMenuItem("删除", "删除账目", (s, e) => DoDelete(), "Del"));
         return menu;
     }
 
@@ -1751,6 +1994,16 @@ public partial class MainWindow : Window
         {
             var entry = GetSelectedIdDocument();
             if (entry is null) { Announce("请先选中一个证件。"); return; }
+            entry.IsFavorite = !entry.IsFavorite;
+            entry.ModifiedTime = DateTime.Now;
+            SavePasswordVault();
+            RefreshList();
+            Announce(entry.IsFavorite ? $"已收藏：{entry.Title}。" : $"已取消收藏：{entry.Title}。");
+        }
+        else if (_currentModule == Module.Accounting && EnsureUnlocked())
+        {
+            var entry = GetSelectedAccounting();
+            if (entry is null) { Announce("请先选中一个账目。"); return; }
             entry.IsFavorite = !entry.IsFavorite;
             entry.ModifiedTime = DateTime.Now;
             SavePasswordVault();
@@ -2066,7 +2319,7 @@ public partial class MainWindow : Window
             var urlCount = _urlData.Entries.Count;
             var snippetCount = _snippetData.Entries.Count;
             var vaultInfo = includeVault
-                ? $"密码 {_vault!.Entries.Count} 条、日记 {_vault.Notes.Count} 篇、证件 {_vault.IdDocuments.Count} 条"
+                ? $"密码 {_vault!.Entries.Count} 条、日记 {_vault.Notes.Count} 篇、证件 {_vault.IdDocuments.Count} 条、记账 {_vault.Accountings.Count} 笔"
                 : "密码库未包含";
 
             if (includeVault)
@@ -2116,7 +2369,7 @@ public partial class MainWindow : Window
         var parts = new List<string>();
         if (urlData is not null) parts.Add($"网址 {urlData.Entries.Count} 条");
         if (snippetData is not null) parts.Add($"记事本 {snippetData.Entries.Count} 条");
-        if (vault is not null) parts.Add($"密码 {vault.Entries.Count} 条、日记 {vault.Notes.Count} 篇、证件 {vault.IdDocuments.Count} 条");
+        if (vault is not null) parts.Add($"密码 {vault.Entries.Count} 条、日记 {vault.Notes.Count} 篇、证件 {vault.IdDocuments.Count} 条、记账 {vault.Accountings.Count} 笔");
         else if (hasVault) parts.Add("密码库（解密失败，将跳过）");
 
         var summary = string.Join("、", parts);

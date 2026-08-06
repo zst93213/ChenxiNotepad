@@ -33,6 +33,8 @@ public static class ShortcutConfigService
             new() { ActionName = "SwitchPassword", DisplayName = "切换到密码收藏", KeyGesture = "Ctrl+3", DefaultGesture = "Ctrl+3", Category = "导航" },
             new() { ActionName = "SwitchNote", DisplayName = "切换到日记", KeyGesture = "Ctrl+4", DefaultGesture = "Ctrl+4", Category = "导航" },
             new() { ActionName = "SwitchIdDocument", DisplayName = "切换到证件保存", KeyGesture = "Ctrl+5", DefaultGesture = "Ctrl+5", Category = "导航" },
+            new() { ActionName = "SwitchAccounting", DisplayName = "切换到记账", KeyGesture = "Ctrl+6", DefaultGesture = "Ctrl+6", Category = "导航" },
+            new() { ActionName = "AccountingStats", DisplayName = "播报当月统计", KeyGesture = "Ctrl+Shift+S", DefaultGesture = "Ctrl+Shift+S", Category = "记账" },
             new() { ActionName = "CopySnippet", DisplayName = "复制笔记内容", KeyGesture = "Ctrl+Shift+C", DefaultGesture = "Ctrl+Shift+C", Category = "记事本" },
             new() { ActionName = "CycleFocus", DisplayName = "切换焦点区域", KeyGesture = "F6", DefaultGesture = "F6", Category = "导航" },
             new() { ActionName = "OpenUrl", DisplayName = "打开网址", KeyGesture = "Enter", DefaultGesture = "Enter", Category = "网址" },

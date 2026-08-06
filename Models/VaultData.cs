@@ -19,6 +19,10 @@ public class VaultData
     [JsonPropertyName("idDocuments")]
     public List<IdDocumentEntry> IdDocuments { get; set; } = new();
 
+    /// <summary>记账条目列表（加密存储）。</summary>
+    [JsonPropertyName("accountings")]
+    public List<AccountingEntry> Accountings { get; set; } = new();
+
     /// <summary>审计日志列表（仅本地存储）。</summary>
     [JsonPropertyName("auditLogs")]
     public List<AuditLogEntry> AuditLogs { get; set; } = new();
