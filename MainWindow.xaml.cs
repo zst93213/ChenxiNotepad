@@ -994,6 +994,12 @@ public partial class MainWindow : Window
         // Ctrl+Shift+X 导出TXT
         if (ctrl && shift && e.Key == Key.X) { e.Handled = true; DoExportTxt(); return; }
 
+        // Ctrl+Shift+A 全量备份
+        if (ctrl && shift && e.Key == Key.A) { e.Handled = true; DoFullBackup(); return; }
+
+        // Ctrl+Shift+R 全量恢复
+        if (ctrl && shift && e.Key == Key.R) { e.Handled = true; DoFullRestore(); return; }
+
         // F2 编辑
         if (e.Key == Key.F2 && !ctrl && !shift && IsListFocused())
         {
@@ -1152,6 +1158,8 @@ public partial class MainWindow : Window
     private void OnImport(object sender, RoutedEventArgs e) => DoImport();
     private void OnBackup(object sender, RoutedEventArgs e) => DoBackup();
     private void OnRestore(object sender, RoutedEventArgs e) => DoRestore();
+    private void OnFullBackup(object sender, RoutedEventArgs e) => DoFullBackup();
+    private void OnFullRestore(object sender, RoutedEventArgs e) => DoFullRestore();
     private void OnChangeMasterPassword(object sender, RoutedEventArgs e) => DoChangeMasterPassword();
     private void OnSettings(object sender, RoutedEventArgs e) => DoSettings();
     private void OnDuplicateCheck(object sender, RoutedEventArgs e) => DoDuplicateCheck();
@@ -2025,6 +2033,139 @@ public partial class MainWindow : Window
                 else Announce("恢复失败，文件无效或主密码不匹配。");
             }
         }
+    }
+
+    // ---- 全量备份与恢复 ----
+
+    private void DoFullBackup()
+    {
+        // 判断是否包含密码库
+        var includeVault = _isUnlocked && _vault is not null && !string.IsNullOrEmpty(_masterPassword);
+
+        if (!includeVault)
+        {
+            // 未解锁时提示：将仅备份网址和记事本
+            var choice = MessageBox.Show(this,
+                "密码库未解锁，全量备份将仅包含网址收藏和记事本数据（不含密码/日记/证件）。\n\n" +
+                "如需包含全部数据，请先解锁密码库后再执行全量备份。\n\n是否继续？",
+                "全量备份", MessageBoxButton.OKCancel, MessageBoxImage.Information);
+
+            if (choice != MessageBoxResult.OK) return;
+        }
+
+        var dlg = new SaveFileDialog
+        {
+            Filter = "全量备份|*.bnfull",
+            FileName = $"BlindNotepad_全量备份_{DateTime.Now:yyyyMMdd_HHmmss}.bnfull"
+        };
+
+        if (dlg.ShowDialog() != true) { Announce("已取消全量备份。"); return; }
+
+        if (BackupService.ExportFullBackup(_urlData, _snippetData, _vault, _masterPassword, dlg.FileName))
+        {
+            var urlCount = _urlData.Entries.Count;
+            var snippetCount = _snippetData.Entries.Count;
+            var vaultInfo = includeVault
+                ? $"密码 {_vault!.Entries.Count} 条、日记 {_vault.Notes.Count} 篇、证件 {_vault.IdDocuments.Count} 条"
+                : "密码库未包含";
+
+            if (includeVault)
+                AuditLogService.Log(_vault, "全量备份", $"导出全量备份：网址 {urlCount}、记事本 {snippetCount}、密码库");
+
+            Announce($"全量备份成功。网址 {urlCount} 条、记事本 {snippetCount} 条、{vaultInfo}。");
+        }
+        else
+        {
+            Announce("全量备份失败。");
+        }
+    }
+
+    private void DoFullRestore()
+    {
+        var dlg = new OpenFileDialog { Filter = "全量备份|*.bnfull" };
+        if (dlg.ShowDialog() != true) { Announce("已取消全量恢复。"); return; }
+
+        // 尝试读取备份文件，判断是否包含密码库
+        // 先尝试用当前主密码解密（如果已解锁）
+        string? masterPassword = _masterPassword;
+        bool wasUnlocked = _isUnlocked;
+
+        if (!wasUnlocked)
+        {
+            // 未解锁时需要用户输入主密码
+            masterPassword = PromptForMasterPassword();
+            if (string.IsNullOrEmpty(masterPassword))
+            {
+                Announce("已取消全量恢复。");
+                return;
+            }
+        }
+
+        var (urlData, snippetData, vault, hasVault) = BackupService.ImportFullBackup(dlg.FileName, masterPassword!);
+
+        if (urlData is null && snippetData is null && vault is null)
+        {
+            // 可能是密码不匹配
+            Announce(hasVault
+                ? "恢复失败，主密码不匹配或文件已损坏。"
+                : "恢复失败，文件无效。");
+            return;
+        }
+
+        // 确认覆盖
+        var parts = new List<string>();
+        if (urlData is not null) parts.Add($"网址 {urlData.Entries.Count} 条");
+        if (snippetData is not null) parts.Add($"记事本 {snippetData.Entries.Count} 条");
+        if (vault is not null) parts.Add($"密码 {vault.Entries.Count} 条、日记 {vault.Notes.Count} 篇、证件 {vault.IdDocuments.Count} 条");
+        else if (hasVault) parts.Add("密码库（解密失败，将跳过）");
+
+        var summary = string.Join("、", parts);
+        if (!ConfirmDelete($"确认从备份文件恢复吗？\n\n备份内容：{summary}\n\n当前所有数据将被覆盖，此操作不可撤销。"))
+        {
+            Announce("已取消全量恢复。");
+            return;
+        }
+
+        // 恢复网址
+        if (urlData is not null)
+        {
+            _urlData = urlData;
+            if (_urlData.Categories.Count == 0) _urlData.Categories.Add("默认");
+            StorageService.SaveUrls(_urlData);
+        }
+
+        // 恢复记事本
+        if (snippetData is not null)
+        {
+            _snippetData = snippetData;
+            if (_snippetData.Categories.Count == 0) _snippetData.Categories.Add("默认");
+            StorageService.SaveSnippets(_snippetData);
+        }
+
+        // 恢复密码库
+        if (vault is not null)
+        {
+            _vault = vault;
+            _masterPassword = masterPassword;
+            _isUnlocked = true;
+            SavePasswordVault();
+            SetupAutoLockTimer();
+            EnableAntiScreenshot();
+            AuditLogService.Log(_vault, "全量恢复", $"从全量备份恢复：网址 {(urlData?.Entries.Count ?? 0)}、记事本 {(snippetData?.Entries.Count ?? 0)}、密码库");
+        }
+
+        RefreshTree();
+        RefreshList();
+        SwitchToModule(Module.Url);
+
+        Announce($"全量恢复成功。{summary}。");
+    }
+
+    /// <summary>弹出一个简单的密码输入对话框，用于全量恢复时输入主密码。</summary>
+    private string? PromptForMasterPassword()
+    {
+        var dialog = new FullRestorePasswordDialog { Owner = this };
+        return dialog.ShowDialog() == true ? dialog.Password : null;
     }
 
     private void DoImport()

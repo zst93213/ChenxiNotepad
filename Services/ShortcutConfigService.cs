@@ -47,6 +47,8 @@ public static class ShortcutConfigService
             new() { ActionName = "ToggleFavorite", DisplayName = "切换收藏", KeyGesture = "Ctrl+Shift+F", DefaultGesture = "Ctrl+Shift+F", Category = "通用" },
             new() { ActionName = "ToggleSort", DisplayName = "切换排序", KeyGesture = "Ctrl+Shift+O", DefaultGesture = "Ctrl+Shift+O", Category = "通用" },
             new() { ActionName = "ExportTxt", DisplayName = "导出TXT", KeyGesture = "Ctrl+Shift+X", DefaultGesture = "Ctrl+Shift+X", Category = "通用" },
+            new() { ActionName = "FullBackup", DisplayName = "全量备份", KeyGesture = "Ctrl+Shift+A", DefaultGesture = "Ctrl+Shift+A", Category = "通用" },
+            new() { ActionName = "FullRestore", DisplayName = "全量恢复", KeyGesture = "Ctrl+Shift+R", DefaultGesture = "Ctrl+Shift+R", Category = "通用" },
             new() { ActionName = "InsertTemplate", DisplayName = "插入模板", KeyGesture = "Ctrl+Shift+I", DefaultGesture = "Ctrl+Shift+I", Category = "记事本" },
             new() { ActionName = "BrowseByMonth", DisplayName = "按月浏览日记", KeyGesture = "Ctrl+Shift+M", DefaultGesture = "Ctrl+Shift+M", Category = "日记" },
         };

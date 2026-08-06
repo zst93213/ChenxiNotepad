@@ -16,9 +16,12 @@
                 <MenuItem Header="新建(_N)" InputGestureText="Ctrl+N" Click="OnNew" AutomationProperties.Name="新建条目"/>
                 <MenuItem Header="保存(_S)" InputGestureText="Ctrl+S" Click="OnSave" AutomationProperties.Name="保存"/>
                 <Separator/>
+                <MenuItem Header="全量备份(_A)" InputGestureText="Ctrl+Shift+A" Click="OnFullBackup" AutomationProperties.Name="全量备份所有数据"/>
+                <MenuItem Header="全量恢复(_R)" InputGestureText="Ctrl+Shift+R" Click="OnFullRestore" AutomationProperties.Name="从全量备份恢复"/>
+                <Separator/>
                 <MenuItem Header="导入数据(_I)" Click="OnImport" AutomationProperties.Name="导入书签或密码"/>
                 <MenuItem Header="导出备份(_B)" Click="OnBackup" AutomationProperties.Name="导出加密备份"/>
-                <MenuItem Header="从备份恢复(_R)" Click="OnRestore" AutomationProperties.Name="从备份恢复数据"/>
+                <MenuItem Header="从备份恢复(_E)" Click="OnRestore" AutomationProperties.Name="从备份恢复数据"/>
                 <Separator/>
                 <MenuItem Header="修改主密码(_M)" Click="OnChangeMasterPassword" AutomationProperties.Name="修改主密码"/>
                 <MenuItem Header="设置(_T)" Click="OnSettings" AutomationProperties.Name="应用设置"/>
