@@ -12,7 +12,7 @@ namespace BlindNotepad
     /// </summary>
     public partial class App : Application
     {
-        private const string AppDataFolderName = "BlindNotepad";
+        private const string AppDataFolderName = "SuixinJi";
 
         protected override void OnStartup(StartupEventArgs e)
         {

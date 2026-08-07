@@ -11,7 +11,7 @@ namespace BlindNotepad.Services;
 public static class UpdateService
 {
     public const string RepoOwner = "zst93213";
-    public const string RepoName = "BlindNotepad-Releases";
+    public const string RepoName = "ChenxiNotepad";
     private const string ApiUrl = "https://api.github.com/repos/{Owner}/{Repo}/releases/latest";
 
     private static readonly HttpClient _http = new()
@@ -63,7 +63,7 @@ public static class UpdateService
         {
             var url = ApiUrl.Replace("{Owner}", repoOwner).Replace("{Repo}", repoName);
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
-            req.Headers.Add("User-Agent", "BlindNotepad-UpdateCheck");
+            req.Headers.Add("User-Agent", "SuixinJi-UpdateCheck");
             req.Headers.Add("Accept", "application/vnd.github+json");
 
             using var resp = await _http.SendAsync(req);

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    BlindNotepad - 面向盲人用户的网址收藏与密码本桌面应用
+    随心记 - 面向盲人用户的网址收藏与密码本桌面应用
     目标框架: .NET 8 (Windows desktop), WPF
     说明:
       - System.Security.Cryptography (AES/HMAC/PBKDF2/RandomNumberGenerator 等)
@@ -19,14 +19,14 @@
     <LangVersion>12</LangVersion>
     <UseWPF>true</UseWPF>
     <RootNamespace>BlindNotepad</RootNamespace>
-    <AssemblyName>BlindNotepad</AssemblyName>
+    <AssemblyName>SuixinJi</AssemblyName>
     <!-- 允许在非 Windows 平台上编译 Windows 桌面项目 -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <!-- 发布版本信息 -->
-    <Version>1.4.0</Version>
-    <Company>BlindNotepad</Company>
-    <Product>BlindNotepad 盲人记事本</Product>
-    <Description>面向盲人用户的网址收藏与密码本桌面应用，支持纯键盘操作与争渡读屏适配。</Description>
+    <Version>2.0.0</Version>
+    <Company>SuixinJi</Company>
+    <Product>随心记</Product>
+    <Description>随心记 - 面向盲人用户的网址收藏与密码本桌面应用，支持纯键盘操作与争渡读屏适配。</Description>
     <!-- NuGet Restore 使用项目内缓存 -->
     <RestorePackagesPath>$(MSBuildProjectDirectory)\.nuget\packages</RestorePackagesPath>
   </PropertyGroup>

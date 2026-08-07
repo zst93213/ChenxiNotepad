@@ -7,7 +7,7 @@ namespace BlindNotepad.Services;
 /// <summary>
 /// 存储服务: 负责网址收藏 (urls.json, 明文 JSON)、文案收藏 (snippets.json, 明文 JSON) 与密码库
 /// (passwords.bnvault, 加密 Base64 文本) 的读写, 以及 RFC 6238 TOTP 生成。
-/// 存储目录: %LocalAppData%/BlindNotepad
+/// 存储目录: %LocalAppData%/SuixinJi
 /// (System / System.Collections.Generic / System.IO 由 ImplicitUsings 提供。)
 /// </summary>
 public static class StorageService
@@ -15,7 +15,7 @@ public static class StorageService
     /// <summary>应用数据根目录。</summary>
     public static readonly string AppDataDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "BlindNotepad");
+        "SuixinJi");
 
     /// <summary>网址数据文件名 (明文 JSON)。</summary>
     public const string UrlsFileName = "urls.json";

@@ -85,6 +85,7 @@ public partial class NoteEditDialog : Window
         Closed += (_, _) =>
         {
             _draftTimer?.Stop();
+            SpeechService.Stop();
             if (Result is not null)
                 DraftService.Clear(DraftModuleKey);
         };
@@ -139,6 +140,14 @@ public partial class NoteEditDialog : Window
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // Ctrl+H 查找替换
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && e.Key == Key.H)
+        {
+            e.Handled = true;
+            OnFindReplace(sender, e);
+            return;
+        }
+
         if (e.Key != Key.Enter) return;
         var focused = FocusManager.GetFocusedElement(this) as TextBox;
         var inMultiline = focused is not null && focused.AcceptsReturn;
@@ -176,6 +185,52 @@ public partial class NoteEditDialog : Window
         _a11y.Announce(formatButton, $"已应用「{preset.Name}」排版。");
         contentBox.Focus();
         contentBox.CaretIndex = contentBox.Text.Length;
+    }
+
+    // ================================================================
+    //  查找替换、朗读、语音输入
+    // ================================================================
+
+    /// <summary>打开查找替换对话框。</summary>
+    private void OnFindReplace(object sender, RoutedEventArgs e)
+    {
+        var dialog = new FindReplaceDialog(contentBox) { Owner = this };
+        dialog.Show();
+    }
+
+    /// <summary>朗读选中文本或全部内容。</summary>
+    private void OnSpeak(object sender, RoutedEventArgs e)
+    {
+        var text = contentBox.SelectedText;
+        if (string.IsNullOrEmpty(text))
+            text = contentBox.Text;
+
+        if (string.IsNullOrEmpty(text))
+        {
+            _a11y.Announce(speakButton, "内容为空，无法朗读。");
+            return;
+        }
+
+        SpeechService.SpeakAsync(text, rate: 0);
+        _a11y.Announce(speakButton, "开始朗读。");
+        statusText.Text = "正在朗读...";
+    }
+
+    /// <summary>停止朗读。</summary>
+    private void OnStopSpeak(object sender, RoutedEventArgs e)
+    {
+        SpeechService.Stop();
+        _a11y.Announce(stopSpeakButton, "已停止朗读。");
+        statusText.Text = "";
+    }
+
+    /// <summary>启动语音输入（Windows 听写）。</summary>
+    private void OnVoiceInput(object sender, RoutedEventArgs e)
+    {
+        contentBox.Focus();
+        VoiceInputService.StartDictation();
+        _a11y.Announce(voiceInputButton, "已启动语音输入，请说话。说完成后文字会插入到光标位置。");
+        statusText.Text = "语音输入已启动...";
     }
 
     private void SaveAndClose()

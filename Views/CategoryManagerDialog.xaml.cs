@@ -39,7 +39,7 @@ public partial class CategoryManagerDialog : Window
         if (e.Key == Key.F2) { e.Handled = true; OnRename(null, null); }
     }
 
-    private void OnAdd(object sender, RoutedEventArgs e)
+    private void OnAdd(object? sender, RoutedEventArgs? e)
     {
         var name = newCategoryBox.Text?.Trim();
         if (string.IsNullOrEmpty(name))
@@ -59,7 +59,7 @@ public partial class CategoryManagerDialog : Window
         _a11y.Announce(categoryList, $"已添加分类：{name}。");
     }
 
-    private void OnRename(object sender, RoutedEventArgs? e)
+    private void OnRename(object? sender, RoutedEventArgs? e)
     {
         var index = categoryList.SelectedIndex;
         if (index < 0) { _a11y.Announce(categoryList, "请先选择一个分类。"); return; }
@@ -73,7 +73,7 @@ public partial class CategoryManagerDialog : Window
         _a11y.Announce(categoryList, $"已将\"{oldName}\"重命名为\"{newName}\"。");
     }
 
-    private void OnDelete(object sender, RoutedEventArgs? e)
+    private void OnDelete(object? sender, RoutedEventArgs? e)
     {
         var index = categoryList.SelectedIndex;
         if (index < 0) { _a11y.Announce(categoryList, "请先选择一个分类。"); return; }

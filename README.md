@@ -1,11 +1,11 @@
-# BlindNotepad 盲人记事本与密码本
+# 随心记
 
 面向盲人用户的网址收藏与密码本桌面应用，支持纯键盘操作与争渡读屏适配。
 
 ## 项目结构
 
 ```
-BlindNotepad/
+SuixinJi/
 ├── .github/
 │   └── workflows/
 │       └── build.yml          # GitHub Actions CI/CD 工作流
@@ -51,7 +51,7 @@ dotnet publish -c Release -r win-x64 --self-contained true \
 ### 工作方式
 
 1. 推送代码到 `main`/`master` 分支 → 自动构建，产物上传为 Artifact
-2. 推送 `v*` 标签（如 `v1.0.0`）→ 自动构建并发布到 GitHub Releases
+2. 推送 `v*` 标签（如 `v2.0.0`）→ 自动构建并发布到 GitHub Releases
 3. 提交 Pull Request → 自动构建验证（不发布）
 4. 手动触发 → 在 Actions 页面点击 "Run workflow"
 
@@ -59,8 +59,8 @@ dotnet publish -c Release -r win-x64 --self-contained true \
 
 ```bash
 # 创建标签并推送，触发自动发布
-git tag v1.0.0
-git push origin v1.0.0
+git tag v2.0.0
+git push origin v2.0.0
 ```
 
 ### 缓存策略
@@ -78,4 +78,3 @@ git push origin v1.0.0
 - 自定义快捷键（导出/导入配置）
 - 重复检测、数据备份恢复、审计日志
 - TOTP 动态验证码、防截屏保护
-```

@@ -35,7 +35,7 @@ public partial class ImportDialog : Window
         }
     }
 
-    private void OnImport(object sender, RoutedEventArgs e)
+    private void OnImport(object? sender, RoutedEventArgs? e)
     {
         var path = filePathBox.Text?.Trim();
         if (string.IsNullOrEmpty(path))

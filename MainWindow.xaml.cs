@@ -92,8 +92,8 @@ public partial class MainWindow : Window
 
         var screenReader = _a11y.IsScreenReaderRunning();
         Announce(screenReader
-            ? "欢迎使用 BlindNotepad，已检测到读屏软件。当前：网址收藏。"
-            : "欢迎使用 BlindNotepad。当前：网址收藏。");
+            ? "欢迎使用随心记，已检测到读屏软件。当前：网址收藏。"
+            : "欢迎使用随心记。当前：网址收藏。");
     }
 
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -1465,7 +1465,7 @@ public partial class MainWindow : Window
     private void OnAbout(object sender, RoutedEventArgs e)
     {
         MessageBox.Show(this,
-            "BlindNotepad 盲人记事本 v1.4\n\n"
+            "随心记 v2.0\n\n"
             + "面向盲人用户的网址收藏、记事本、密码本、日记、证件保存与记账应用。\n"
             + "支持纯键盘操作、争渡读屏适配、自动锁定、审计日志、\n"
             + "防截屏、备份恢复、导入、重复检测、网址健康检查、\n"
@@ -2534,7 +2534,7 @@ public partial class MainWindow : Window
         var dlg = new SaveFileDialog
         {
             Filter = "全量备份|*.bnfull",
-            FileName = $"BlindNotepad_全量备份_{DateTime.Now:yyyyMMdd_HHmmss}.bnfull"
+            FileName = $"SuixinJi_全量备份_{DateTime.Now:yyyyMMdd_HHmmss}.bnfull"
         };
 
         if (dlg.ShowDialog() != true) { Announce("已取消全量备份。"); return; }
