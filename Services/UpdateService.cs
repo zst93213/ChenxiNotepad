@@ -11,7 +11,7 @@ namespace BlindNotepad.Services;
 public static class UpdateService
 {
     public const string RepoOwner = "zst93213";
-    public const string RepoName = "ChenxiNotepad";
+    public const string RepoName = "BlindNotepad-Releases";
     private const string ApiUrl = "https://api.github.com/repos/{Owner}/{Repo}/releases/latest";
 
     private static readonly HttpClient _http = new()
