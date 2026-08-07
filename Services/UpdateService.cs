@@ -10,8 +10,8 @@ namespace BlindNotepad.Services;
 /// </summary>
 public static class UpdateService
 {
-    public const string RepoOwner = "BlindNotepad";
-    public const string RepoName = "BlindNotepad";
+    public const string RepoOwner = "zst93213";
+    public const string RepoName = "ChenxiNotepad";
     private const string ApiUrl = "https://api.github.com/repos/{Owner}/{Repo}/releases/latest";
 
     private static readonly HttpClient _http = new()
