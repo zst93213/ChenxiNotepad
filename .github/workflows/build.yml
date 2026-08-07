@@ -23,6 +23,9 @@ env:
   CONFIGURATION: Release
   RUNTIME: win-x64
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: 构建打包
