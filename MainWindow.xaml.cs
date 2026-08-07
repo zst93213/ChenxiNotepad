@@ -19,7 +19,7 @@ namespace BlindNotepad;
 /// </summary>
 public partial class MainWindow : Window
 {
-    private enum Module { Url, Snippet, Password, Note, IdDocument, Accounting }
+    private enum Module { Url, Snippet, Password, Note, IdDocument, Accounting, Story }
 
     private Module _currentModule = Module.Url;
     private bool _isLoaded;
@@ -44,6 +44,8 @@ public partial class MainWindow : Window
     private List<IdDocumentEntry> _filteredIdDocuments = new();
     private List<AccountingEntry> _filteredAccountings = new();
     private SnippetCollectionData _snippetData = new();
+    private StoryCollectionData _storyData = new();
+    private List<StoryEntry> _filteredStories = new();
 
     // 无障碍与剪贴板服务
     private readonly AccessibilityService _a11y = new();
@@ -287,6 +289,13 @@ public partial class MainWindow : Window
         {
             _snippetData.Categories.Add("默认");
         }
+
+        // 加载话本数据
+        _storyData = StoryService.Load();
+        if (_storyData.Categories.Count == 0)
+        {
+            _storyData.Categories.Add("默认");
+        }
     }
 
     private void OnUrlModuleChecked(object sender, RoutedEventArgs e)
@@ -319,6 +328,16 @@ public partial class MainWindow : Window
         if (_isLoaded) SwitchToModule(Module.Accounting);
     }
 
+    private void OnStoryModuleChecked(object sender, RoutedEventArgs e)
+    {
+        if (_isLoaded) SwitchToModule(Module.Story);
+    }
+
+    private void OnSwitchStory(object sender, RoutedEventArgs e)
+    {
+        storyModuleRadio.IsChecked = true;
+    }
+
     private void SwitchToModule(Module module)
     {
         _currentModule = module;
@@ -329,6 +348,7 @@ public partial class MainWindow : Window
         noteListBox.Visibility = Visibility.Collapsed;
         idDocumentListBox.Visibility = Visibility.Collapsed;
         accountingListBox.Visibility = Visibility.Collapsed;
+        storyListBox.Visibility = Visibility.Collapsed;
         unlockPanel.Visibility = Visibility.Collapsed;
         masterPasswordConfirmBox.Visibility = Visibility.Collapsed;
 
@@ -422,6 +442,22 @@ public partial class MainWindow : Window
             {
                 ShowUnlockPanel();
             }
+        }
+
+        if (module == Module.Story)
+        {
+            storyListBox.Visibility = Visibility.Visible;
+            addButton.Visibility = Visibility.Visible;
+            addButton.Content = "+ 导入小说(_A)";
+            RefreshTree();
+            RefreshList();
+            UpdateDetail();
+            FocusList();
+            UpdateStatus();
+        }
+        else
+        {
+            addButton.Content = "+ 添加(_A)";
         }
 
         ResetActivityTimer();
@@ -648,6 +684,19 @@ public partial class MainWindow : Window
             foreach (var cat in cats.OrderBy(c => c))
                 categoryTree.Items.Add(MakeTreeNode(cat, cat));
         }
+        else if (_currentModule == Module.Story)
+        {
+            categoryTree.Items.Clear();
+            categoryTree.Items.Add(MakeTreeNode("全部话本", null));
+            var cats = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var story in _storyData.Entries)
+            {
+                if (!string.IsNullOrWhiteSpace(story.Author))
+                    cats.Add(story.Author);
+            }
+            foreach (var cat in cats.OrderBy(c => c))
+                categoryTree.Items.Add(MakeTreeNode($"作者: {cat}", cat));
+        }
 
         if (categoryTree.Items.Count > 0 && categoryTree.Items[0] is TreeViewItem first)
             first.IsSelected = true;
@@ -821,6 +870,32 @@ public partial class MainWindow : Window
             if (accountingListBox.Items.Count > 0) accountingListBox.SelectedIndex = 0;
             else UpdateDetailForEmpty();
         }
+        else if (_currentModule == Module.Story)
+        {
+            storyListBox.Items.Clear();
+            _filteredStories = _storyData.Entries
+                .Where(s => _currentFilter is null || s.Author == _currentFilter)
+                .Where(s => string.IsNullOrEmpty(search)
+                            || s.Title.Contains(search, StringComparison.OrdinalIgnoreCase)
+                            || s.Author.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            _filteredStories = SortEntries(_filteredStories, s => s.IsFavorite, s => s.Title, s => s.CreatedTime, s => s.ModifiedTime);
+
+            foreach (var entry in _filteredStories)
+            {
+                var prefix = entry.IsFavorite ? "★ " : "";
+                var progress = entry.ProgressPercent > 0 ? $" [{entry.ProgressPercent:F0}%]" : "";
+                var chapters = entry.Chapters.Count > 0 ? $" ({entry.Chapters.Count}章)" : "";
+                var display = $"{prefix}{entry.Title}{chapters}{progress}";
+                var item = new ListBoxItem { Content = display, Tag = entry };
+                AutomationProperties.SetName(item, $"{(entry.IsFavorite ? "收藏 " : "")}{entry.Title} {chapters} 进度{entry.ProgressPercent:F0}%");
+                item.ContextMenu = BuildStoryContextMenu();
+                storyListBox.Items.Add(item);
+            }
+
+            if (storyListBox.Items.Count > 0) storyListBox.SelectedIndex = 0;
+            else UpdateDetailForEmpty();
+        }
 
         UpdateStatus();
     }
@@ -900,6 +975,7 @@ public partial class MainWindow : Window
     private NoteEntry? GetSelectedNote() => (noteListBox.SelectedItem as ListBoxItem)?.Tag as NoteEntry;
     private IdDocumentEntry? GetSelectedIdDocument() => (idDocumentListBox.SelectedItem as ListBoxItem)?.Tag as IdDocumentEntry;
     private AccountingEntry? GetSelectedAccounting() => (accountingListBox.SelectedItem as ListBoxItem)?.Tag as AccountingEntry;
+    private StoryEntry? GetSelectedStory() => (storyListBox.SelectedItem as ListBoxItem)?.Tag as StoryEntry;
 
     private void OnUrlSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -931,11 +1007,17 @@ public partial class MainWindow : Window
         if (_currentModule == Module.Accounting) { UpdateDetail(); UpdateStatus(); }
     }
 
+    private void OnStorySelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_currentModule == Module.Story) { UpdateDetail(); UpdateStatus(); }
+    }
+
     private void OnUrlDoubleClick(object sender, MouseButtonEventArgs e) => DoOpenUrl();
     private void OnSnippetDoubleClick(object sender, MouseButtonEventArgs e) => DoEdit();
     private void OnNoteDoubleClick(object sender, MouseButtonEventArgs e) => DoEdit();
     private void OnIdDocumentDoubleClick(object sender, MouseButtonEventArgs e) => DoEdit();
     private void OnAccountingDoubleClick(object sender, MouseButtonEventArgs e) => DoEdit();
+    private void OnStoryDoubleClick(object sender, MouseButtonEventArgs e) => DoStoryRead();
 
     private void UpdateDetail()
     {
@@ -947,6 +1029,7 @@ public partial class MainWindow : Window
             Module.Note => GetSelectedNote() is { } note ? BuildNoteDetail(note) : "（未选中日记）",
             Module.IdDocument => GetSelectedIdDocument() is { } doc ? BuildIdDocumentDetail(doc) : "（未选中证件）",
             Module.Accounting => GetSelectedAccounting() is { } acc ? BuildAccountingDetail(acc) : "（未选中账目）",
+            Module.Story => GetSelectedStory() is { } story ? BuildStoryDetail(story) : "（未选中话本）",
             _ => ""
         };
     }
@@ -1084,6 +1167,28 @@ public partial class MainWindow : Window
                + "提示：Enter 编辑 | Del 删除 | F2 编辑 | Ctrl+Shift+S 播报统计 | Ctrl+Shift+F 收藏";
     }
 
+    private string BuildStoryDetail(StoryEntry entry)
+    {
+        entry.UpdateProgress();
+        var currentChapter = entry.CurrentChapter;
+        var chapterInfo = currentChapter is not null
+            ? $"当前章节：第{currentChapter.Index}章 {currentChapter.Title}"
+            : "当前章节：无";
+
+        return $"标题：{entry.Title}\n"
+               + $"作者：{(string.IsNullOrEmpty(entry.Author) ? "未知" : entry.Author)}\n"
+               + $"来源文件：{entry.SourceFileName}\n"
+               + $"章节数：{entry.Chapters.Count}\n"
+               + $"总字数：{entry.TotalChars}\n"
+               + $"{chapterInfo}\n"
+               + $"阅读进度：{entry.ProgressPercent:F1}%\n"
+               + $"收藏：{(entry.IsFavorite ? "是" : "否")}\n"
+               + $"创建时间：{entry.CreatedTime:yyyy-MM-dd HH:mm}\n"
+               + $"修改时间：{entry.ModifiedTime:yyyy-MM-dd HH:mm}\n"
+               + (entry.LastReadTime.HasValue ? $"上次阅读：{entry.LastReadTime:yyyy-MM-dd HH:mm}\n" : "")
+               + $"\n提示：Enter 或双击打开阅读器 | Del 删除 | Ctrl+Shift+F 收藏";
+    }
+
     /// <summary>计算指定月份的收支汇总文本。</summary>
     private string GetMonthlySummary(DateTime monthDate)
     {
@@ -1141,6 +1246,7 @@ public partial class MainWindow : Window
             Module.Note => "日记",
             Module.IdDocument => "证件保存",
             Module.Accounting => "记账",
+            Module.Story => "话本",
             _ => ""
         };
 
@@ -1160,6 +1266,7 @@ public partial class MainWindow : Window
             Module.Note => _filteredNotes.Count,
             Module.IdDocument => _filteredIdDocuments.Count,
             Module.Accounting => _filteredAccountings.Count,
+            Module.Story => _filteredStories.Count,
             _ => 0
         };
         var index = _currentModule switch
@@ -1170,6 +1277,7 @@ public partial class MainWindow : Window
             Module.Note => noteListBox.SelectedIndex,
             Module.IdDocument => idDocumentListBox.SelectedIndex,
             Module.Accounting => accountingListBox.SelectedIndex,
+            Module.Story => storyListBox.SelectedIndex,
             _ => 0
         };
         statusPositionText.Text = count == 0
@@ -1183,6 +1291,7 @@ public partial class MainWindow : Window
             Module.Password => "Ctrl+Shift+C 复制密码 Del 删除 F2 编辑 Ctrl+Shift+L 锁定",
             Module.Note => "Enter 编辑 Ctrl+Shift+M 按月浏览 Del 删除 F2 编辑 Ctrl+Shift+F 收藏 Ctrl+Shift+X 导出",
             Module.Accounting => "Enter 编辑 Ctrl+Shift+S 播报统计 Del 删除 F2 编辑 Ctrl+Shift+F 收藏 Ctrl+Shift+O 排序",
+            Module.Story => "Enter 阅读 Del 删除 Ctrl+N 导入小说 Ctrl+Shift+F 收藏 Ctrl+Shift+O 排序",
             _ => ""
         };
     }
@@ -1212,6 +1321,7 @@ public partial class MainWindow : Window
         if (ctrl && !shift && e.Key == Key.D4) { e.Handled = true; noteModuleRadio.IsChecked = true; return; }
         if (ctrl && !shift && e.Key == Key.D5) { e.Handled = true; idDocumentModuleRadio.IsChecked = true; return; }
         if (ctrl && !shift && e.Key == Key.D6) { e.Handled = true; accountingModuleRadio.IsChecked = true; return; }
+        if (ctrl && !shift && e.Key == Key.D7) { e.Handled = true; storyModuleRadio.IsChecked = true; return; }
 
         // F6 切换焦点区域
         if (e.Key == Key.F6 && !ctrl && !shift) { e.Handled = true; CycleFocus(); return; }
@@ -1337,6 +1447,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        // 话本列表：Enter 打开阅读器
+        if (_currentModule == Module.Story && storyListBox.IsKeyboardFocusWithin && e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            DoStoryRead();
+            return;
+        }
+
         // Esc 清除搜索
         if (e.Key == Key.Escape && !string.IsNullOrEmpty(searchBox.Text))
         {
@@ -1372,7 +1490,8 @@ public partial class MainWindow : Window
                || (_currentModule == Module.Password && passwordListBox.IsKeyboardFocusWithin)
                || (_currentModule == Module.Note && noteListBox.IsKeyboardFocusWithin)
                || (_currentModule == Module.IdDocument && idDocumentListBox.IsKeyboardFocusWithin)
-               || (_currentModule == Module.Accounting && accountingListBox.IsKeyboardFocusWithin);
+               || (_currentModule == Module.Accounting && accountingListBox.IsKeyboardFocusWithin)
+               || (_currentModule == Module.Story && storyListBox.IsKeyboardFocusWithin);
     }
 
     private void FocusList()
@@ -1383,6 +1502,7 @@ public partial class MainWindow : Window
         else if (_currentModule == Module.Note && _isUnlocked) noteListBox.Focus();
         else if (_currentModule == Module.IdDocument && _isUnlocked) idDocumentListBox.Focus();
         else if (_currentModule == Module.Accounting && _isUnlocked) accountingListBox.Focus();
+        else if (_currentModule == Module.Story) storyListBox.Focus();
         else if ((_currentModule == Module.Password || _currentModule == Module.Note || _currentModule == Module.IdDocument || _currentModule == Module.Accounting) && unlockPanel.Visibility == Visibility.Visible)
             masterPasswordBox.Focus();
     }
@@ -1416,6 +1536,7 @@ public partial class MainWindow : Window
     private void OnPasswordGenerator(object sender, RoutedEventArgs e) => DoPasswordGenerator();
     private void OnToggleFavorite(object sender, RoutedEventArgs e) => DoToggleFavorite();
     private void OnImport(object sender, RoutedEventArgs e) => DoImport();
+    private void OnImportStory(object sender, RoutedEventArgs e) => DoImportStory();
     private void OnBackup(object sender, RoutedEventArgs e) => DoBackup();
     private void OnRestore(object sender, RoutedEventArgs e) => DoRestore();
     private void OnFullBackup(object sender, RoutedEventArgs e) => DoFullBackup();
@@ -1537,6 +1658,7 @@ public partial class MainWindow : Window
         else if (_currentModule == Module.Note && EnsureUnlocked()) NewNote();
         else if (_currentModule == Module.IdDocument && EnsureUnlocked()) NewIdDocument();
         else if (_currentModule == Module.Accounting && EnsureUnlocked()) NewAccounting();
+        else if (_currentModule == Module.Story) DoImportStory();
     }
 
     private void DoEdit()
@@ -1557,6 +1679,7 @@ public partial class MainWindow : Window
         else if (_currentModule == Module.Note && EnsureUnlocked()) DeleteNote();
         else if (_currentModule == Module.IdDocument && EnsureUnlocked()) DeleteIdDocument();
         else if (_currentModule == Module.Accounting && EnsureUnlocked()) DeleteAccounting();
+        else if (_currentModule == Module.Story) DeleteStory();
     }
 
     // ---- 网址增删改 ----
@@ -2026,6 +2149,131 @@ public partial class MainWindow : Window
         return menu;
     }
 
+    private ContextMenu BuildStoryContextMenu()
+    {
+        var menu = new ContextMenu();
+        menu.Items.Add(MakeMenuItem("阅读话本", "打开话本阅读器，自动朗读", (_, _) => DoStoryRead(), "Enter"));
+        menu.Items.Add(MakeMenuItem("导入小说", "从TXT文件导入新小说", (_, _) => DoImportStory(), "Ctrl+N"));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(MakeMenuItem("切换收藏", "切换收藏置顶", (_, _) => DoToggleFavorite(), "Ctrl+Shift+F"));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(MakeMenuItem("删除", "删除话本", (_, _) => DoDelete(), "Del"));
+        return menu;
+    }
+
+    // ---- 话本增删改 ----
+
+    /// <summary>导入小说文件（TXT），自动分章并添加到话本列表。</summary>
+    private void DoImportStory()
+    {
+        var previous = CaptureFocus();
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "选择小说文件",
+            Filter = "文本文件 (*.txt)|*.txt|所有文件 (*.*)|*.*",
+            Multiselect = true,
+        };
+
+        if (dlg.ShowDialog() != true)
+        {
+            Announce("已取消导入。");
+            RestoreFocus(previous);
+            return;
+        }
+
+        int successCount = 0;
+        int failCount = 0;
+        var lastId = "";
+
+        foreach (var filePath in dlg.FileNames)
+        {
+            try
+            {
+                var entry = StoryService.ImportFromFile(filePath);
+                _storyData.Entries.Add(entry);
+                lastId = entry.Id;
+                successCount++;
+            }
+            catch
+            {
+                failCount++;
+            }
+        }
+
+        if (successCount > 0)
+        {
+            StoryService.Save(_storyData);
+            RefreshTree(); RefreshList();
+            if (!string.IsNullOrEmpty(lastId)) SelectStoryById(lastId);
+            Announce(failCount > 0
+                ? $"已导入 {successCount} 部小说，{failCount} 部导入失败。"
+                : $"已导入 {successCount} 部小说。");
+        }
+        else
+        {
+            Announce("导入失败，请检查文件格式。");
+        }
+        RestoreFocus(previous);
+    }
+
+    /// <summary>打开话本阅读器进行朗读。</summary>
+    private void DoStoryRead()
+    {
+        var entry = GetSelectedStory();
+        if (entry is null) { Announce("请先选中一个话本。"); return; }
+        if (entry.Chapters.Count == 0) { Announce("该话本没有章节内容。"); return; }
+
+        var previous = CaptureFocus();
+        var dialog = new StoryReaderDialog(entry, _storyData) { Owner = this };
+
+        dialog.ShowDialog();
+
+        // 阅读器关闭后保存进度
+        if (dialog.Result is not null)
+        {
+            _storyData = dialog.Result;
+            StoryService.Save(_storyData);
+            RefreshList();
+            UpdateDetail();
+        }
+
+        RestoreFocus(previous);
+    }
+
+    /// <summary>删除选中的话本。</summary>
+    private void DeleteStory()
+    {
+        var entry = GetSelectedStory();
+        if (entry is null) { Announce("请先选中要删除的话本。"); return; }
+
+        var result = System.Windows.MessageBox.Show(
+            $"确定要删除话本「{entry.Title}」吗？\n此操作不可撤销。",
+            "确认删除",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (result != MessageBoxResult.Yes)
+        {
+            Announce("已取消删除。");
+            return;
+        }
+
+        _storyData.Entries.Remove(entry);
+        StoryService.Save(_storyData);
+        RefreshTree(); RefreshList();
+        Announce($"已删除话本：{entry.Title}。");
+    }
+
+    private void SelectStoryById(string id)
+    {
+        for (var i = 0; i < storyListBox.Items.Count; i++)
+        {
+            if (storyListBox.Items[i] is ListBoxItem item && item.Tag is StoryEntry entry && entry.Id == id)
+            { storyListBox.SelectedIndex = i; storyListBox.Focus(); return; }
+        }
+        if (storyListBox.Items.Count > 0) { storyListBox.SelectedIndex = 0; storyListBox.Focus(); }
+    }
+
     // ---- 密码增删改 ----
 
     private void SavePasswordVault()
@@ -2232,6 +2480,16 @@ public partial class MainWindow : Window
             entry.IsFavorite = !entry.IsFavorite;
             entry.ModifiedTime = DateTime.Now;
             SavePasswordVault();
+            RefreshList();
+            Announce(entry.IsFavorite ? $"已收藏：{entry.Title}。" : $"已取消收藏：{entry.Title}。");
+        }
+        else if (_currentModule == Module.Story)
+        {
+            var entry = GetSelectedStory();
+            if (entry is null) { Announce("请先选中一个话本。"); return; }
+            entry.IsFavorite = !entry.IsFavorite;
+            entry.ModifiedTime = DateTime.Now;
+            StoryService.Save(_storyData);
             RefreshList();
             Announce(entry.IsFavorite ? $"已收藏：{entry.Title}。" : $"已取消收藏：{entry.Title}。");
         }
