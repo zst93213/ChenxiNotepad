@@ -1,0 +1,56 @@
+<Window x:Class="BlindNotepad.GlobalSearchDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="全局搜索" Height="580" Width="660"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        ResizeMode="CanResize" MinHeight="460" MinWidth="540"
+        FocusManager.FocusedElement="{Binding ElementName=searchBox}"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <DockPanel Margin="12">
+        <!-- 顶部：搜索框 -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <Label Content="搜索(_S):" Target="{Binding ElementName=searchBox}"
+                   AutomationProperties.Name="搜索标签"/>
+            <TextBox x:Name="searchBox" Width="420"
+                     TextChanged="OnSearchChanged"
+                     AutomationProperties.Name="全局搜索输入框，输入关键词搜索所有模块"/>
+            <Button x:Name="clearButton" Content="清除(_C)" Margin="8,0,0,0" Padding="12,4"
+                    Click="OnClear" AutomationProperties.Name="清除搜索内容"/>
+        </StackPanel>
+
+        <!-- 模块筛选：公开 / 私密 / 全部 -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <Label Content="范围:" AutomationProperties.Name="搜索范围标签"/>
+            <RadioButton x:Name="rbAll" Content="全部(_A)" IsChecked="True" Margin="8,0,0,0"
+                         Checked="OnFilterChanged"
+                         AutomationProperties.Name="搜索全部模块"/>
+            <RadioButton x:Name="rbPublic" Content="公开(_P)" Margin="16,0,0,0"
+                         Checked="OnFilterChanged"
+                         AutomationProperties.Name="仅搜索公开模块：网址、记事本"/>
+            <RadioButton x:Name="rbPrivate" Content="私密(_R)" Margin="16,0,0,0"
+                         Checked="OnFilterChanged"
+                         AutomationProperties.Name="仅搜索私密模块：密码、日记、证件、记账"/>
+        </StackPanel>
+
+        <!-- 底部状态栏 + 按钮 -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <TextBlock x:Name="statusText" Text="输入关键词开始搜索"
+                       Opacity="0.7" Margin="0,0,0,8"
+                       AutomationProperties.Name="搜索结果状态"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="openButton" Content="打开选中项(_O)" Padding="16,4" Margin="0,0,8,0"
+                        Click="OnOpen" IsDefault="True"
+                        AutomationProperties.Name="打开选中的搜索结果"/>
+                <Button x:Name="closeButton" Content="关闭(_C)" Padding="16,4"
+                        Click="OnClose" IsCancel="True"
+                        AutomationProperties.Name="关闭全局搜索对话框"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- 结果列表 -->
+        <ListBox x:Name="resultListBox"
+                 MouseDoubleClick="OnResultDoubleClick"
+                 AutomationProperties.Name="搜索结果列表，上下键浏览，回车打开选中项"
+                 KeyDown="ResultList_KeyDown"/>
+    </DockPanel>
+</Window>

@@ -20,7 +20,6 @@
                 <MenuItem Header="全量恢复(_R)" InputGestureText="Ctrl+Shift+R" Click="OnFullRestore" AutomationProperties.Name="从全量备份恢复"/>
                 <Separator/>
                 <MenuItem Header="导入数据(_I)" Click="OnImport" AutomationProperties.Name="导入书签或密码"/>
-                <MenuItem Header="导入小说/画本到话本(_L)" Click="OnImportStory" AutomationProperties.Name="导入TXT或DOCX小说画本文件到话本模块"/>
                 <MenuItem Header="导出备份(_B)" Click="OnBackup" AutomationProperties.Name="导出加密备份"/>
                 <MenuItem Header="从备份恢复(_E)" Click="OnRestore" AutomationProperties.Name="从备份恢复数据"/>
                 <Separator/>
@@ -33,6 +32,7 @@
                 <MenuItem Header="编辑(_E)" InputGestureText="Ctrl+E / F2" Click="OnEdit" AutomationProperties.Name="编辑条目"/>
                 <MenuItem Header="删除(_D)" InputGestureText="Ctrl+D / Del" Click="OnDelete" AutomationProperties.Name="删除条目"/>
                 <MenuItem Header="搜索(_R)" InputGestureText="Ctrl+F" Click="OnSearch" AutomationProperties.Name="搜索"/>
+                <MenuItem Header="全局搜索(_G)" InputGestureText="Ctrl+Shift+G" Click="OnGlobalSearch" AutomationProperties.Name="跨所有模块全文搜索"/>
                 <Separator/>
                 <MenuItem Header="切换收藏(_V)" InputGestureText="Ctrl+Shift+F" Click="OnToggleFavorite" AutomationProperties.Name="切换收藏置顶"/>
                 <MenuItem Header="批量删除(_A)" Click="OnBatchDelete" AutomationProperties.Name="批量删除选中项"/>
@@ -48,7 +48,6 @@
                 <MenuItem Header="日记(_4)" InputGestureText="Ctrl+4" Click="OnSwitchNote" AutomationProperties.Name="切换到日记"/>
                 <MenuItem Header="证件保存(_5)" InputGestureText="Ctrl+5" Click="OnSwitchIdDocument" AutomationProperties.Name="切换到证件保存"/>
                 <MenuItem Header="记账(_6)" InputGestureText="Ctrl+6" Click="OnSwitchAccounting" AutomationProperties.Name="切换到记账"/>
-                <MenuItem Header="话本(_7)" InputGestureText="Ctrl+7" Click="OnSwitchStory" AutomationProperties.Name="切换到话本"/>
                 <Separator/>
                 <MenuItem Header="切换焦点区域(_G)" InputGestureText="F6" Click="OnCycleFocus" AutomationProperties.Name="在分类树/列表/详情之间切换焦点"/>
             </MenuItem>
@@ -110,10 +109,6 @@
                          Margin="10,5" Padding="6,2"
                          Checked="OnAccountingModuleChecked"
                          AutomationProperties.Name="记账模块，按 Ctrl+6 切换"/>
-            <RadioButton x:Name="storyModuleRadio" Content="话本" GroupName="Module"
-                         Margin="10,5" Padding="6,2"
-                         Checked="OnStoryModuleChecked"
-                         AutomationProperties.Name="话本模块，按 Ctrl+7 切换"/>
         </StackPanel>
 
         <!-- 底部状态栏 -->
@@ -128,7 +123,7 @@
                        Text="就绪" VerticalAlignment="Center" Margin="8,0"
                        AutomationProperties.Name="当前位置"/>
             <TextBlock Grid.Column="1" x:Name="statusHintText"
-                       Text="Ctrl+1 网址 Ctrl+2 记事本 Ctrl+3 密码 Ctrl+4 日记 Ctrl+5 证件 Ctrl+6 记账 Ctrl+7 话本 F6 切换区域"
+                       Text="Ctrl+1 网址 Ctrl+2 记事本 Ctrl+3 密码 Ctrl+4 日记 Ctrl+5 证件 Ctrl+6 记账 F6 切换区域"
                        VerticalAlignment="Center" Margin="12,0"
                        AutomationProperties.Name="快捷键提示"/>
             <TextBlock Grid.Column="2" x:Name="statusMessageText"
@@ -213,11 +208,6 @@
                              SelectionChanged="OnAccountingSelectionChanged"
                              MouseDoubleClick="OnAccountingDoubleClick"
                              AutomationProperties.Name="记账列表"/>
-                    <ListBox x:Name="storyListBox" Visibility="Collapsed"
-                             SelectionMode="Single"
-                             SelectionChanged="OnStorySelectionChanged"
-                             MouseDoubleClick="OnStoryDoubleClick"
-                             AutomationProperties.Name="话本列表"/>
                     <Border x:Name="unlockPanel" Visibility="Collapsed"
                             BorderBrush="{DynamicResource PinkMedium}" BorderThickness="1.5" Background="#C0FFFFFF"
                             CornerRadius="10" Padding="24"

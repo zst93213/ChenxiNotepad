@@ -15,6 +15,9 @@
         <Color x:Key="PinkDeep">#FFAD1457</Color>
         <Color x:Key="PinkSoft">#FFFDF2F8</Color>
 
+        <!-- PinkDeep 的画刷资源（Color 不能直接用于 Brush 属性） -->
+        <SolidColorBrush x:Key="PinkDeepBrush" Color="{StaticResource PinkDeep}"/>
+
         <!-- 渐变画刷 -->
         <LinearGradientBrush x:Key="WindowBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
             <GradientStop Color="#FFFDF2F8" Offset="0"/>
@@ -107,7 +110,7 @@
         <Style TargetType="Button">
             <Setter Property="Background" Value="{StaticResource ButtonBackgroundBrush}"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="{StaticResource PinkDeep}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource PinkDeepBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="16,6"/>
             <Setter Property="FontWeight" Value="Medium"/>
@@ -349,7 +352,7 @@
                                 <Setter TargetName="radioBorder" Property="Background"
                                         Value="#30FCE4EC"/>
                                 <Setter Property="FontWeight" Value="Bold"/>
-                                <Setter Property="Foreground" Value="{StaticResource PinkDeep}"/>
+                                <Setter Property="Foreground" Value="{StaticResource PinkDeepBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
