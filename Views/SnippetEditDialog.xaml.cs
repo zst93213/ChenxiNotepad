@@ -51,6 +51,13 @@ public partial class SnippetEditDialog : Window
 
         UpdateCharCount();
 
+        // 填充排版预设下拉菜单
+        foreach (var preset in TextFormatService.Presets)
+        {
+            formatPresetBox.Items.Add(preset.Name);
+        }
+        formatPresetBox.SelectedIndex = 0;
+
         // 设置草稿自动保存计时器
         _draftTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         _draftTimer.Tick += OnDraftTimerTick;
@@ -135,6 +142,32 @@ public partial class SnippetEditDialog : Window
     }
 
     private void OnOk(object sender, RoutedEventArgs e) => SaveAndClose();
+
+    /// <summary>排版按钮点击：对内容框文本应用选中的排版预设。</summary>
+    private void OnFormatClick(object sender, RoutedEventArgs e)
+    {
+        var content = contentBox.Text ?? "";
+        if (string.IsNullOrEmpty(content))
+        {
+            _a11y.Announce(contentBox, "内容为空，无需排版。");
+            return;
+        }
+
+        var presetName = formatPresetBox.SelectedItem as string ?? "不排版（原文）";
+        var preset = TextFormatService.FindPreset(presetName);
+        if (preset is null || preset.Options == TextFormatService.FormatOptions.None)
+        {
+            _a11y.Announce(formatPresetBox, "选择了不排版，内容保持不变。");
+            return;
+        }
+
+        var formatted = TextFormatService.Format(content, preset.Options);
+        contentBox.Text = formatted;
+        UpdateCharCount();
+        _a11y.Announce(formatButton, $"已应用「{preset.Name}」排版。");
+        contentBox.Focus();
+        contentBox.CaretIndex = contentBox.Text.Length;
+    }
 
     private void SaveAndClose()
     {

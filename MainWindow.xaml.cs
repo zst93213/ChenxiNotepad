@@ -881,7 +881,7 @@ public partial class MainWindow : Window
         var menu = new ContextMenu();
         menu.Items.Add(MakeMenuItem("编辑", "编辑日记", (_, _) => DoEdit(), "Ctrl+E"));
         menu.Items.Add(MakeMenuItem("按月浏览", "按月份筛选日记", (_, _) => DoBrowseByMonth(), "Ctrl+Shift+M"));
-        menu.Items.Add(MakeMenuItem("导出TXT", "导出日记为文本文件", (_, _) => DoExportTxt(), "Ctrl+Shift+X"));
+        menu.Items.Add(BuildExportSubMenu());
         menu.Items.Add(new Separator());
         menu.Items.Add(MakeMenuItem("切换收藏", "切换收藏置顶", (_, _) => DoToggleFavorite(), "Ctrl+Shift+F"));
         menu.Items.Add(new Separator());
@@ -1869,13 +1869,134 @@ public partial class MainWindow : Window
 
     // ---- 上下文菜单构建 ----
 
+    /// <summary>构建导出子菜单，列出所有可导出的格式预设。</summary>
+    private MenuItem BuildExportSubMenu()
+    {
+        var exportMenu = new MenuItem { Header = "导出" };
+        AutomationProperties.SetName(exportMenu, "导出菜单，展开选择导出格式");
+
+        foreach (var preset in TextFormatService.Presets)
+        {
+            var presetName = preset.Name; // 闭包捕获
+            var item = new MenuItem
+            {
+                Header = $"{presetName} (.{preset.FileExtension})",
+            };
+            AutomationProperties.SetName(item, $"导出为{presetName}，{preset.Description}");
+            item.Click += (_, _) => DoExportWithPreset(presetName);
+            exportMenu.Items.Add(item);
+        }
+
+        return exportMenu;
+    }
+
+    /// <summary>使用指定排版预设导出当前模块的选中条目。</summary>
+    private void DoExportWithPreset(string presetName)
+    {
+        var preset = TextFormatService.FindPreset(presetName);
+        if (preset is null)
+        {
+            Announce($"找不到排版预设：{presetName}");
+            return;
+        }
+
+        if (_currentModule == Module.Snippet)
+        {
+            var entries = _filteredSnippets.Select(e => (Title: e.Title, Content: e.Content,
+                Extra: $"分类：{e.Category}\n创建：{e.CreatedTime:yyyy-MM-dd HH:mm}"));
+            ExportEntriesWithPreset(entries, "记事本导出", preset);
+        }
+        else if (_currentModule == Module.Note && EnsureUnlocked())
+        {
+            var entries = _filteredNotes.Select(e => (Title: e.Title, Content: e.Content,
+                Extra: $"分类：{e.Category}\n天气：{e.Weather}\n心情：{e.Mood}\n创建：{e.CreatedTime:yyyy-MM-dd HH:mm}"));
+            ExportEntriesWithPreset(entries, "日记导出", preset);
+        }
+        else
+        {
+            Announce("导出仅在记事本和日记模块可用。");
+        }
+    }
+
+    /// <summary>使用排版预设导出条目到文件，弹出保存位置选择对话框。</summary>
+    private void ExportEntriesWithPreset(
+        IEnumerable<(string Title, string Content, string Extra)> entries,
+        string defaultName,
+        TextFormatService.FormatPreset preset)
+    {
+        var ext = preset.FileExtension;
+        var filterDesc = ext switch
+        {
+            "md" => "Markdown 文件",
+            "html" => "网页文件",
+            _ => "文本文件",
+        };
+
+        var dlg = new SaveFileDialog
+        {
+            Filter = $"{filterDesc}|*.{ext}",
+            FileName = $"{defaultName}_{DateTime.Now:yyyyMMdd}.{ext}"
+        };
+        if (dlg.ShowDialog() != true) { Announce("已取消导出。"); return; }
+
+        try
+        {
+            var count = 0;
+            var sb = new System.Text.StringBuilder();
+
+            // 如果是单条目导出且有 WrapContent（如 HTML），使用包装
+            var entryList = entries.ToList();
+            if (entryList.Count == 1 && preset.WrapContent is not null)
+            {
+                var entry = entryList[0];
+                var content = preset.Options != TextFormatService.FormatOptions.None
+                    ? TextFormatService.Format(entry.Content, preset.Options)
+                    : entry.Content;
+                sb.Append(preset.WrapContent(entry.Title, content));
+                count = 1;
+            }
+            else
+            {
+                foreach (var entry in entryList)
+                {
+                    var content = preset.Options != TextFormatService.FormatOptions.None
+                        ? TextFormatService.Format(entry.Content, preset.Options)
+                        : entry.Content;
+
+                    if (preset.WrapContent is not null)
+                    {
+                        sb.Append(preset.WrapContent(entry.Title, content));
+                    }
+                    else
+                    {
+                        sb.AppendLine(new string('=', 50));
+                        sb.AppendLine($"标题：{entry.Title}");
+                        sb.AppendLine(entry.Extra);
+                        sb.AppendLine(new string('-', 50));
+                        sb.AppendLine(content);
+                        sb.AppendLine();
+                    }
+                    count++;
+                }
+            }
+
+            using var writer = new System.IO.StreamWriter(dlg.FileName, false, System.Text.Encoding.UTF8);
+            writer.Write(sb.ToString());
+            Announce($"已导出 {count} 条到 {System.IO.Path.GetFileName(dlg.FileName)}，格式：{preset.Name}。");
+        }
+        catch (Exception ex)
+        {
+            Announce($"导出失败：{ex.Message}");
+        }
+    }
+
     private ContextMenu BuildSnippetContextMenu()
     {
         var menu = new ContextMenu();
         menu.Items.Add(MakeMenuItem("编辑", "编辑笔记", (s, e) => DoEdit(), "F2"));
         menu.Items.Add(MakeMenuItem("复制笔记内容", "复制笔记内容到剪贴板", (s, e) => DoCopySnippet()));
         menu.Items.Add(MakeMenuItem("插入模板", "选择模板复制到剪贴板", (s, e) => DoInsertTemplate(), "Ctrl+Shift+I"));
-        menu.Items.Add(MakeMenuItem("导出TXT", "导出笔记为文本文件", (s, e) => DoExportTxt(), "Ctrl+Shift+X"));
+        menu.Items.Add(BuildExportSubMenu());
         menu.Items.Add(new Separator());
         menu.Items.Add(MakeMenuItem("删除", "删除笔记", (s, e) => DoDelete(), "Del"));
         return menu;
