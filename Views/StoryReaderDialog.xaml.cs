@@ -7,8 +7,9 @@ using BlindNotepad.Services;
 namespace BlindNotepad;
 
 /// <summary>
-/// 话本阅读器对话框。支持小说导入后的自动朗读、章节导航、语速控制、进度记忆。
-/// 快捷键: Space 播放/暂停, 左右键 上/下章, Esc 关闭。
+/// 话本阅读器对话框。支持小说/画本的自动朗读、分集导航、语速控制、进度记忆。
+/// 画本格式支持多角色配音（男女声区分）、角色表显示、角色名播报。
+/// 快捷键: Space 播放/暂停, 左右键 上/下集, Esc 关闭。
 /// </summary>
 public partial class StoryReaderDialog : Window
 {
@@ -27,15 +28,15 @@ public partial class StoryReaderDialog : Window
         _storyData = storyData;
 
         titleBox.Text = story.Title;
-        authorBox.Text = story.Author;
+        formatBox.Text = story.IsAudioDrama ? "画本" : "小说";
         rateSlider.Value = story.ReadingRate;
         rateText.Text = story.ReadingRate.ToString();
 
-        // 填充章节下拉
+        // 填充分集下拉
         _isChapterBoxUpdating = true;
         foreach (var ch in story.Chapters)
         {
-            chapterBox.Items.Add($"第{ch.Index}章 {ch.Title}");
+            chapterBox.Items.Add($"第{ch.Index}集 {ch.Title}");
         }
         _isChapterBoxUpdating = false;
 
@@ -46,22 +47,84 @@ public partial class StoryReaderDialog : Window
             DisplayChapter(idx);
         }
 
+        // 填充角色表（画本格式）
+        if (story.IsAudioDrama && story.Characters.Count > 0)
+        {
+            characterCountText.Text = $"共 {story.Characters.Count} 个角色";
+            foreach (var ch in story.Characters)
+            {
+                var genderIcon = ch.IsMale ? "♂" : ch.IsFemale ? "♀" : "—";
+                var display = $"{genderIcon} {ch.Name}" +
+                              (string.IsNullOrEmpty(ch.CvName) || ch.CvName == "暂无CV" ? "" : $" [{ch.CvName}]") +
+                              $" ({ch.LineCount}句)";
+                if (!string.IsNullOrEmpty(ch.VoiceType) && ch.VoiceType != "无")
+                    display += $" {ch.VoiceType}";
+
+                var item = new ListBoxItem { Content = display, Tag = ch };
+                var tooltip = ch.Description;
+                if (!string.IsNullOrEmpty(ch.AgeGroup) && ch.AgeGroup != "无")
+                    tooltip = $"[{ch.AgeGroup}] {tooltip}";
+                item.ToolTip = tooltip;
+                characterListBox.Items.Add(item);
+            }
+        }
+        else
+        {
+            characterCountText.Text = "纯文本格式无角色表";
+        }
+
         // 注册朗读事件
         SpeechService.ReadingProgressChanged += OnReadingProgress;
         SpeechService.ChapterChanged += OnChapterChanged;
         SpeechService.ReadingCompleted += OnReadingCompleted;
+        SpeechService.SpeakerChanged += OnSpeakerChanged;
 
         UpdateProgressDisplay();
     }
 
-    /// <summary>显示指定章节内容。</summary>
+    /// <summary>显示指定分集内容。</summary>
     private void DisplayChapter(int index)
     {
         if (index < 0 || index >= _story.Chapters.Count) return;
 
         var chapter = _story.Chapters[index];
-        contentBox.Text = chapter.Content;
-        chapterInfoText.Text = $"第{chapter.Index}章 / 共{_story.Chapters.Count}章 | {chapter.Content.Length}字";
+
+        // 画本格式：用台词行格式化显示
+        if (_story.IsAudioDrama && chapter.DialogueLines.Count > 0)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"═══ {chapter.Title} ═══");
+            sb.AppendLine();
+
+            foreach (var line in chapter.DialogueLines)
+            {
+                switch (line.Type)
+                {
+                    case LineType.Narration:
+                        sb.AppendLine($"  {line.Text}");
+                        sb.AppendLine();
+                        break;
+                    case LineType.Dialogue:
+                        sb.AppendLine($"【{line.CharacterName}】\u201C{line.Text}\u201D");
+                        sb.AppendLine();
+                        break;
+                    case LineType.InnerThought:
+                        sb.AppendLine($"（OS）【{line.CharacterName}】\u201C{line.Text}\u201D");
+                        sb.AppendLine();
+                        break;
+                    case LineType.SoundEffect:
+                        sb.AppendLine($"  〔音效〕{line.Text}");
+                        break;
+                }
+            }
+            contentBox.Text = sb.ToString();
+        }
+        else
+        {
+            contentBox.Text = chapter.Content;
+        }
+
+        chapterInfoText.Text = $"第{chapter.Index}集 / 共{_story.Chapters.Count}集 | {chapter.Content.Length}字";
         contentBox.ScrollToHome();
 
         _story.CurrentChapterIndex = index;
@@ -80,7 +143,7 @@ public partial class StoryReaderDialog : Window
     }
 
     // ================================================================
-    //  章节导航
+    //  分集导航
     // ================================================================
 
     private void OnPrevChapter(object sender, RoutedEventArgs e)
@@ -91,7 +154,7 @@ public partial class StoryReaderDialog : Window
         }
         else
         {
-            _a11y.Announce(prevChapterButton, "已经是第一章了。");
+            _a11y.Announce(prevChapterButton, "已经是第一集了。");
         }
     }
 
@@ -103,7 +166,7 @@ public partial class StoryReaderDialog : Window
         }
         else
         {
-            _a11y.Announce(nextChapterButton, "已经是最后一章了。");
+            _a11y.Announce(nextChapterButton, "已经是最后一集了。");
         }
     }
 
@@ -143,12 +206,38 @@ public partial class StoryReaderDialog : Window
             return;
         }
 
-        // 开始朗读
-        var chapters = _story.Chapters.Select(c => c.Content).ToList();
-        var titles = _story.Chapters.Select(c => $"第{c.Index}章 {c.Title}").ToList();
         var rate = (int)rateSlider.Value;
 
-        SpeechService.StartContinuousReading(chapters, titles, _story.CurrentChapterIndex, rate);
+        if (_story.IsAudioDrama)
+        {
+            // 画本格式：多角色配音朗读
+            var chapters = _story.Chapters.Select(c => c.DialogueLines).ToList();
+            var titles = _story.Chapters.Select(c => $"第{c.Index}集 {c.Title}").ToList();
+            var announceSpeaker = announceSpeakerCheckBox.IsChecked == true;
+
+            SpeechService.StartMultiVoiceReading(
+                chapters, titles, _story.Characters,
+                _story.CurrentChapterIndex, rate, announceSpeaker);
+
+            var voiceInfo = "";
+            if (SpeechService.HasMaleVoice && SpeechService.HasFemaleVoice)
+                voiceInfo = "男声女声已就绪，";
+            else if (SpeechService.HasFemaleVoice)
+                voiceInfo = "女声已就绪，";
+            else if (SpeechService.HasMaleVoice)
+                voiceInfo = "男声已就绪，";
+
+            _a11y.Announce(playButton, $"{voiceInfo}开始多角色朗读。");
+        }
+        else
+        {
+            // 纯文本格式：连续朗读
+            var chapters = _story.Chapters.Select(c => c.Content).ToList();
+            var titles = _story.Chapters.Select(c => $"第{c.Index}章 {c.Title}").ToList();
+
+            SpeechService.StartContinuousReading(chapters, titles, _story.CurrentChapterIndex, rate);
+            _a11y.Announce(playButton, "开始朗读。");
+        }
 
         playButton.Content = "播放中";
         playButton.IsEnabled = false;
@@ -158,7 +247,6 @@ public partial class StoryReaderDialog : Window
         prevSentenceButton.IsEnabled = true;
         pauseButton.Content = "暂停";
         statusText.Text = "正在朗读...";
-        _a11y.Announce(playButton, "开始朗读。");
     }
 
     private void OnPause(object sender, RoutedEventArgs e)
@@ -180,6 +268,7 @@ public partial class StoryReaderDialog : Window
         ResetPlayButtons();
         statusText.Text = "已停止";
         currentSentenceText.Text = "";
+        speakerNameText.Text = "";
         _a11y.Announce(stopButton, "已停止朗读。");
     }
 
@@ -193,9 +282,8 @@ public partial class StoryReaderDialog : Window
     {
         SpeechService.StopAll();
         ResetPlayButtons();
-        // 重新开始朗读当前章节
         OnPlay(sender, e);
-        _a11y.Announce(prevSentenceButton, "重新朗读本章。");
+        _a11y.Announce(prevSentenceButton, "重新朗读本集。");
     }
 
     private void OnRateChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -233,7 +321,7 @@ public partial class StoryReaderDialog : Window
             }
 
             currentSentenceText.Text = sentence;
-            statusText.Text = $"正在朗读: 第{chapterIndex + 1}章 {progress:F0}%";
+            statusText.Text = $"正在朗读: 第{chapterIndex + 1}集 {progress:F0}%";
 
             // 更新章节内进度
             var chapter = _story.Chapters[chapterIndex];
@@ -252,6 +340,14 @@ public partial class StoryReaderDialog : Window
         });
     }
 
+    private void OnSpeakerChanged(string speakerName, string lineType)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            speakerNameText.Text = string.IsNullOrEmpty(speakerName) ? "" : $"{speakerName} · {lineType}";
+        });
+    }
+
     private void OnReadingCompleted()
     {
         Dispatcher.Invoke(() =>
@@ -259,11 +355,12 @@ public partial class StoryReaderDialog : Window
             ResetPlayButtons();
             statusText.Text = "朗读完成";
             currentSentenceText.Text = "";
+            speakerNameText.Text = "";
             _story.CurrentChapterIndex = _story.Chapters.Count - 1;
             _story.CurrentCharPosition = 0;
             _story.UpdateProgress();
             UpdateProgressDisplay();
-            _a11y.Announce(playButton, "全书朗读完成。");
+            _a11y.Announce(playButton, "全部朗读完成。");
         });
     }
 
@@ -292,7 +389,7 @@ public partial class StoryReaderDialog : Window
             return;
         }
 
-        // 左键: 上一章
+        // 左键: 上一集
         if (e.Key == Key.Left)
         {
             e.Handled = true;
@@ -300,7 +397,7 @@ public partial class StoryReaderDialog : Window
             return;
         }
 
-        // 右键: 下一章
+        // 右键: 下一集
         if (e.Key == Key.Right)
         {
             e.Handled = true;
@@ -327,6 +424,7 @@ public partial class StoryReaderDialog : Window
         SpeechService.ReadingProgressChanged -= OnReadingProgress;
         SpeechService.ChapterChanged -= OnChapterChanged;
         SpeechService.ReadingCompleted -= OnReadingCompleted;
+        SpeechService.SpeakerChanged -= OnSpeakerChanged;
 
         // 保存进度
         _story.ModifiedTime = DateTime.Now;

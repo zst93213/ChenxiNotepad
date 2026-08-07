@@ -23,7 +23,7 @@
     <!-- 允许在非 Windows 平台上编译 Windows 桌面项目 -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <!-- 发布版本信息 -->
-    <Version>2.1.0</Version>
+    <Version>2.2.0</Version>
     <Company>SuixinJi</Company>
     <Product>随心记</Product>
     <Description>随心记 - 面向盲人用户的网址收藏与密码本桌面应用，支持纯键盘操作与争渡读屏适配。</Description>

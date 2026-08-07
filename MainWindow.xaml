@@ -20,7 +20,7 @@
                 <MenuItem Header="全量恢复(_R)" InputGestureText="Ctrl+Shift+R" Click="OnFullRestore" AutomationProperties.Name="从全量备份恢复"/>
                 <Separator/>
                 <MenuItem Header="导入数据(_I)" Click="OnImport" AutomationProperties.Name="导入书签或密码"/>
-                <MenuItem Header="导入小说到话本(_L)" Click="OnImportStory" AutomationProperties.Name="导入TXT小说文件到话本模块"/>
+                <MenuItem Header="导入小说/画本到话本(_L)" Click="OnImportStory" AutomationProperties.Name="导入TXT或DOCX小说画本文件到话本模块"/>
                 <MenuItem Header="导出备份(_B)" Click="OnBackup" AutomationProperties.Name="导出加密备份"/>
                 <MenuItem Header="从备份恢复(_E)" Click="OnRestore" AutomationProperties.Name="从备份恢复数据"/>
                 <Separator/>

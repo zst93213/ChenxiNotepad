@@ -448,7 +448,7 @@ public partial class MainWindow : Window
         {
             storyListBox.Visibility = Visibility.Visible;
             addButton.Visibility = Visibility.Visible;
-            addButton.Content = "+ 导入小说(_A)";
+            addButton.Content = "+ 导入作品(_A)";
             RefreshTree();
             RefreshList();
             UpdateDetail();
@@ -884,11 +884,13 @@ public partial class MainWindow : Window
             foreach (var entry in _filteredStories)
             {
                 var prefix = entry.IsFavorite ? "★ " : "";
+                var formatTag = entry.IsAudioDrama ? "【画本】" : "";
                 var progress = entry.ProgressPercent > 0 ? $" [{entry.ProgressPercent:F0}%]" : "";
-                var chapters = entry.Chapters.Count > 0 ? $" ({entry.Chapters.Count}章)" : "";
-                var display = $"{prefix}{entry.Title}{chapters}{progress}";
+                var chapterLabel = entry.IsAudioDrama ? "集" : "章";
+                var chapters = entry.Chapters.Count > 0 ? $" ({entry.Chapters.Count}{chapterLabel})" : "";
+                var display = $"{prefix}{formatTag}{entry.Title}{chapters}{progress}";
                 var item = new ListBoxItem { Content = display, Tag = entry };
-                AutomationProperties.SetName(item, $"{(entry.IsFavorite ? "收藏 " : "")}{entry.Title} {chapters} 进度{entry.ProgressPercent:F0}%");
+                AutomationProperties.SetName(item, $"{(entry.IsFavorite ? "收藏 " : "")}{(entry.IsAudioDrama ? "画本 " : "")}{entry.Title} {chapters} 进度{entry.ProgressPercent:F0}%");
                 item.ContextMenu = BuildStoryContextMenu();
                 storyListBox.Items.Add(item);
             }
@@ -1171,22 +1173,60 @@ public partial class MainWindow : Window
     {
         entry.UpdateProgress();
         var currentChapter = entry.CurrentChapter;
+        var formatLabel = entry.IsAudioDrama ? "画本/广播剧" : "纯文本小说";
+        var chapterLabel = entry.IsAudioDrama ? "集" : "章";
         var chapterInfo = currentChapter is not null
-            ? $"当前章节：第{currentChapter.Index}章 {currentChapter.Title}"
-            : "当前章节：无";
+            ? $"当前{chapterLabel}：第{currentChapter.Index}{chapterLabel} {currentChapter.Title}"
+            : $"当前{chapterLabel}：无";
 
-        return $"标题：{entry.Title}\n"
-               + $"作者：{(string.IsNullOrEmpty(entry.Author) ? "未知" : entry.Author)}\n"
-               + $"来源文件：{entry.SourceFileName}\n"
-               + $"章节数：{entry.Chapters.Count}\n"
-               + $"总字数：{entry.TotalChars}\n"
-               + $"{chapterInfo}\n"
-               + $"阅读进度：{entry.ProgressPercent:F1}%\n"
-               + $"收藏：{(entry.IsFavorite ? "是" : "否")}\n"
-               + $"创建时间：{entry.CreatedTime:yyyy-MM-dd HH:mm}\n"
-               + $"修改时间：{entry.ModifiedTime:yyyy-MM-dd HH:mm}\n"
-               + (entry.LastReadTime.HasValue ? $"上次阅读：{entry.LastReadTime:yyyy-MM-dd HH:mm}\n" : "")
-               + $"\n提示：Enter 或双击打开阅读器 | Del 删除 | Ctrl+Shift+F 收藏";
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"标题：{entry.Title}");
+        sb.AppendLine($"格式：{formatLabel}");
+        sb.AppendLine($"作者：{(string.IsNullOrEmpty(entry.Author) ? "未知" : entry.Author)}");
+        sb.AppendLine($"来源文件：{entry.SourceFileName}");
+        sb.AppendLine($"{chapterLabel}数：{entry.Chapters.Count}");
+        sb.AppendLine($"总字数：{entry.TotalChars}");
+
+        // 画本格式：显示角色统计
+        if (entry.IsAudioDrama && entry.Characters.Count > 0)
+        {
+            var males = entry.Characters.Count(c => c.IsMale);
+            var females = entry.Characters.Count(c => c.IsFemale);
+            var totalLines = entry.Characters.Sum(c => c.LineCount);
+            sb.AppendLine($"角色数：{entry.Characters.Count}（男{males} 女{females}）");
+            sb.AppendLine($"台词总数：{totalLines}");
+
+            // 列出前5个主要角色（按台词数排序）
+            var topChars = entry.Characters
+                .Where(c => !c.IsNarrator)
+                .OrderByDescending(c => c.LineCount)
+                .Take(5)
+                .ToList();
+            if (topChars.Count > 0)
+            {
+                sb.AppendLine("主要角色：");
+                foreach (var c in topChars)
+                {
+                    var gender = c.IsMale ? "男" : c.IsFemale ? "女" : "?";
+                    sb.AppendLine($"  {c.Name}（{gender}）{c.LineCount}句 {c.VoiceType}");
+                }
+            }
+        }
+
+        sb.AppendLine(chapterInfo);
+        sb.AppendLine($"阅读进度：{entry.ProgressPercent:F1}%");
+        sb.AppendLine($"收藏：{(entry.IsFavorite ? "是" : "否")}");
+        sb.AppendLine($"创建时间：{entry.CreatedTime:yyyy-MM-dd HH:mm}");
+        sb.AppendLine($"修改时间：{entry.ModifiedTime:yyyy-MM-dd HH:mm}");
+        if (entry.LastReadTime.HasValue)
+            sb.AppendLine($"上次阅读：{entry.LastReadTime:yyyy-MM-dd HH:mm}");
+
+        sb.AppendLine();
+        sb.Append(entry.IsAudioDrama
+            ? "提示：Enter 或双击打开阅读器（多角色配音）| Del 删除 | Ctrl+Shift+F 收藏"
+            : "提示：Enter 或双击打开阅读器 | Del 删除 | Ctrl+Shift+F 收藏");
+
+        return sb.ToString();
     }
 
     /// <summary>计算指定月份的收支汇总文本。</summary>
@@ -2153,7 +2193,7 @@ public partial class MainWindow : Window
     {
         var menu = new ContextMenu();
         menu.Items.Add(MakeMenuItem("阅读话本", "打开话本阅读器，自动朗读", (_, _) => DoStoryRead(), "Enter"));
-        menu.Items.Add(MakeMenuItem("导入小说", "从TXT文件导入新小说", (_, _) => DoImportStory(), "Ctrl+N"));
+        menu.Items.Add(MakeMenuItem("导入作品", "从TXT/DOCX文件导入新小说或画本", (_, _) => DoImportStory(), "Ctrl+N"));
         menu.Items.Add(new Separator());
         menu.Items.Add(MakeMenuItem("切换收藏", "切换收藏置顶", (_, _) => DoToggleFavorite(), "Ctrl+Shift+F"));
         menu.Items.Add(new Separator());
@@ -2163,14 +2203,14 @@ public partial class MainWindow : Window
 
     // ---- 话本增删改 ----
 
-    /// <summary>导入小说文件（TXT），自动分章并添加到话本列表。</summary>
+    /// <summary>导入小说/画本文件（TXT/DOCX），自动检测格式并分章。</summary>
     private void DoImportStory()
     {
         var previous = CaptureFocus();
         var dlg = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "选择小说文件",
-            Filter = "文本文件 (*.txt)|*.txt|所有文件 (*.*)|*.*",
+            Title = "选择小说/画本文件",
+            Filter = "文本文件 (*.txt)|*.txt|Word文档 (*.docx)|*.docx|所有文件 (*.*)|*.*",
             Multiselect = true,
         };
 
@@ -2184,14 +2224,25 @@ public partial class MainWindow : Window
         int successCount = 0;
         int failCount = 0;
         var lastId = "";
+        var lastFormat = "";
 
         foreach (var filePath in dlg.FileNames)
         {
             try
             {
-                var entry = StoryService.ImportFromFile(filePath);
+                StoryEntry entry;
+                var ext = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
+                if (ext == ".docx")
+                {
+                    entry = StoryService.ImportFromDocx(filePath);
+                }
+                else
+                {
+                    entry = StoryService.ImportFromFile(filePath);
+                }
                 _storyData.Entries.Add(entry);
                 lastId = entry.Id;
+                lastFormat = entry.IsAudioDrama ? "画本" : "小说";
                 successCount++;
             }
             catch
@@ -2206,8 +2257,8 @@ public partial class MainWindow : Window
             RefreshTree(); RefreshList();
             if (!string.IsNullOrEmpty(lastId)) SelectStoryById(lastId);
             Announce(failCount > 0
-                ? $"已导入 {successCount} 部小说，{failCount} 部导入失败。"
-                : $"已导入 {successCount} 部小说。");
+                ? $"已导入 {successCount} 部作品（{lastFormat}），{failCount} 部导入失败。"
+                : $"已导入 {successCount} 部作品（{lastFormat}）。");
         }
         else
         {
