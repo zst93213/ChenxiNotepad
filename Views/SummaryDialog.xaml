@@ -1,0 +1,50 @@
+<Window x:Class="BlindNotepad.SummaryDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="文章总结与标题提取" Height="640" Width="560"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        ResizeMode="CanResize" MinHeight="560" MinWidth="480"
+        FocusManager.FocusedElement="{Binding ElementName=summaryBox}">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 内容摘要区域 -->
+        <Label Grid.Row="0" Content="内容摘要（可编辑）(_S):" AutomationProperties.Name="内容摘要标签"/>
+        <TextBox Grid.Row="1" x:Name="summaryBox" Margin="0,4,0,8"
+                 AcceptsReturn="True" TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto"
+                 AutomationProperties.Name="内容摘要编辑框，显示文章的主要内容摘要，可编辑修改"/>
+
+        <!-- 标题提取区域 -->
+        <Label Grid.Row="2" Content="提取标题/标签（Tab键切换到此区域）(_T):" AutomationProperties.Name="提取标题标签"/>
+        <ListBox Grid.Row="3" x:Name="titleListBox" Height="140" Margin="0,4,0,4"
+                 AutomationProperties.Name="提取的标题列表，上下键浏览，回车复制到剪贴板"
+                 MouseDoubleClick="OnTitleDoubleClick"
+                 KeyDown="OnTitleKeyDown"/>
+
+        <!-- 标签区域 -->
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,4,0,8">
+            <Label Content="话题标签:" AutomationProperties.Name="话题标签标签"/>
+            <TextBlock x:Name="tagsText" VerticalAlignment="Center" TextWrapping="Wrap"
+                       AutomationProperties.Name="话题标签显示"/>
+            <Button x:Name="copyTagsButton" Content="复制标签(_G)" Padding="10,4" Margin="12,0,0,0"
+                    Click="OnCopyTags" AutomationProperties.Name="复制话题标签到剪贴板"/>
+        </StackPanel>
+
+        <!-- 底部按钮 -->
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button x:Name="copySummaryButton" Content="复制摘要(_C)" Padding="16,4" Margin="0,0,8,0"
+                    Click="OnCopySummary" AutomationProperties.Name="复制摘要到剪贴板"/>
+            <Button x:Name="copyTitleButton" Content="复制选中标题(_P)" Padding="16,4" Margin="0,0,8,0"
+                    Click="OnCopySelectedTitle" AutomationProperties.Name="复制选中的标题到剪贴板"/>
+            <Button Content="关闭(_X)" Padding="16,4" IsCancel="True" AutomationProperties.Name="关闭对话框"/>
+        </StackPanel>
+    </Grid>
+</Window>

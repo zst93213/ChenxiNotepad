@@ -14,7 +14,6 @@ namespace BlindNotepad;
 /// </summary>
 public partial class SnippetEditDialog : Window
 {
-    private const int MaxContentLength = 10000;
     private const string DraftModuleKey = "snippet";
 
     private readonly SnippetEntry? _existing;
@@ -119,7 +118,7 @@ public partial class SnippetEditDialog : Window
     private void UpdateCharCount()
     {
         var len = contentBox.Text?.Length ?? 0;
-        charCountText.Text = $"{len} / {MaxContentLength}";
+        charCountText.Text = $"共 {len} 字";
     }
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -180,12 +179,6 @@ public partial class SnippetEditDialog : Window
         }
 
         var content = contentBox.Text ?? string.Empty;
-        if (content.Length > MaxContentLength)
-        {
-            _a11y.Announce(contentBox, $"内容超出限制，最多 {MaxContentLength} 字，当前 {content.Length} 字。");
-            contentBox.Focus();
-            return;
-        }
 
         Result = new SnippetEntry
         {

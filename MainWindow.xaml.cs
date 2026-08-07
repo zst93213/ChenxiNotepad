@@ -881,6 +881,7 @@ public partial class MainWindow : Window
         var menu = new ContextMenu();
         menu.Items.Add(MakeMenuItem("编辑", "编辑日记", (_, _) => DoEdit(), "Ctrl+E"));
         menu.Items.Add(MakeMenuItem("按月浏览", "按月份筛选日记", (_, _) => DoBrowseByMonth(), "Ctrl+Shift+M"));
+        menu.Items.Add(MakeMenuItem("总结", "总结日记内容并提取标题标签", (_, _) => DoSummary()));
         menu.Items.Add(BuildExportSubMenu());
         menu.Items.Add(new Separator());
         menu.Items.Add(MakeMenuItem("切换收藏", "切换收藏置顶", (_, _) => DoToggleFavorite(), "Ctrl+Shift+F"));
@@ -1996,6 +1997,7 @@ public partial class MainWindow : Window
         menu.Items.Add(MakeMenuItem("编辑", "编辑笔记", (s, e) => DoEdit(), "F2"));
         menu.Items.Add(MakeMenuItem("复制笔记内容", "复制笔记内容到剪贴板", (s, e) => DoCopySnippet()));
         menu.Items.Add(MakeMenuItem("插入模板", "选择模板复制到剪贴板", (s, e) => DoInsertTemplate(), "Ctrl+Shift+I"));
+        menu.Items.Add(MakeMenuItem("总结", "总结文章内容并提取标题标签", (s, e) => DoSummary()));
         menu.Items.Add(BuildExportSubMenu());
         menu.Items.Add(new Separator());
         menu.Items.Add(MakeMenuItem("删除", "删除笔记", (s, e) => DoDelete(), "Del"));
@@ -2893,6 +2895,48 @@ public partial class MainWindow : Window
         };
         RefreshList();
         Announce($"已切换为{modeName}。");
+    }
+
+    // =========================================================================
+    // 文章总结与标题提取
+    // =========================================================================
+
+    /// <summary>总结当前选中条目的内容，弹出总结对话框。</summary>
+    private void DoSummary()
+    {
+        string? title = null;
+        string? content = null;
+
+        if (_currentModule == Module.Snippet)
+        {
+            var entry = GetSelectedSnippet();
+            if (entry is null) { Announce("请先选中一篇笔记。"); return; }
+            title = entry.Title;
+            content = entry.Content;
+        }
+        else if (_currentModule == Module.Note && EnsureUnlocked())
+        {
+            var entry = GetSelectedNote();
+            if (entry is null) { Announce("请先选中一篇日记。"); return; }
+            title = entry.Title;
+            content = entry.Content;
+        }
+        else
+        {
+            Announce("总结功能仅在记事本和日记模块可用。");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            Announce("内容为空，无法生成总结。");
+            return;
+        }
+
+        var previous = CaptureFocus();
+        var dialog = new SummaryDialog(title!, content!) { Owner = this };
+        dialog.ShowDialog();
+        RestoreFocus(previous);
     }
 
     // =========================================================================
