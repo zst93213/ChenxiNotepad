@@ -236,7 +236,7 @@ public static class UpdateService
 chcp 65001 >nul
 echo Updating SuixinJi, please wait...
 
-REM 等待旧进程退出（tasklist 过滤器语法必须为 "PID eq <pid>"）
+REM 等待旧进程退出（tasklist 过滤器语法必须为 PID eq <pid>）
 :waitloop
 tasklist /FI ""PID eq {pid}"" /NH 2>nul | find ""{pid}"" >nul
 if %errorlevel%==0 (
