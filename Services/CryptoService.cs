@@ -140,8 +140,15 @@ public static class CryptoService
         byte[] plaintext = JsonSerializer.SerializeToUtf8Bytes(data, VaultJsonOptions);
         byte[] salt = RandomNumberGenerator.GetBytes(SaltSize);
         byte[] key = DeriveKey(masterPassword, salt);
-        byte[] blob = EncryptToBlob(plaintext, key, salt);
-        return Convert.ToBase64String(blob);
+        try
+        {
+            byte[] blob = EncryptToBlob(plaintext, key, salt);
+            return Convert.ToBase64String(blob);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
+        }
     }
 
     /// <summary>
@@ -153,6 +160,7 @@ public static class CryptoService
     /// <returns>密码库数据; 失败返回 null。</returns>
     public static VaultData? DecryptVault(string base64Data, string masterPassword)
     {
+        byte[]? key = null;
         try
         {
             if (string.IsNullOrWhiteSpace(base64Data))
@@ -163,13 +171,18 @@ public static class CryptoService
                 return null;
 
             byte[] salt = blob.AsSpan(0, SaltSize).ToArray();
-            byte[] key = DeriveKey(masterPassword, salt);
+            key = DeriveKey(masterPassword, salt);
             byte[] plaintext = Decrypt(blob, key);
             return JsonSerializer.Deserialize<VaultData>(plaintext, VaultJsonOptions);
         }
         catch
         {
             return null;
+        }
+        finally
+        {
+            if (key is not null)
+                CryptographicOperations.ZeroMemory(key);
         }
     }
 
@@ -181,6 +194,7 @@ public static class CryptoService
     /// <returns>主密码正确返回 true, 否则 false。</returns>
     public static bool VerifyPassword(string base64Data, string masterPassword)
     {
+        byte[]? key = null;
         try
         {
             if (string.IsNullOrWhiteSpace(base64Data))
@@ -191,7 +205,7 @@ public static class CryptoService
                 return false;
 
             byte[] salt = blob.AsSpan(0, SaltSize).ToArray();
-            byte[] key = DeriveKey(masterPassword, salt);
+            key = DeriveKey(masterPassword, salt);
 
             byte[] iv = blob.AsSpan(SaltSize, IvSize).ToArray();
             byte[] mac = blob.AsSpan(SaltSize + IvSize, HmacSize).ToArray();
@@ -203,6 +217,11 @@ public static class CryptoService
         catch
         {
             return false;
+        }
+        finally
+        {
+            if (key is not null)
+                CryptographicOperations.ZeroMemory(key);
         }
     }
 

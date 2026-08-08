@@ -26,6 +26,9 @@ public static class StorageService
     /// <summary>密码库文件名 (加密 Base64 文本)。</summary>
     public const string VaultFileName = "passwords.bnvault";
 
+    /// <summary>密码库自动备份文件名 (保存前的上一版本)。</summary>
+    public const string VaultBackupFileName = "passwords.bnvault.bak";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -35,12 +38,33 @@ public static class StorageService
     private static string UrlsFilePath => Path.Combine(AppDataDir, UrlsFileName);
     private static string SnippetsFilePath => Path.Combine(AppDataDir, SnippetsFileName);
     private static string VaultFilePath => Path.Combine(AppDataDir, VaultFileName);
+    private static string VaultBackupFilePath => Path.Combine(AppDataDir, VaultBackupFileName);
 
     /// <summary>确保应用数据目录存在。</summary>
     private static void EnsureDirectory()
     {
         if (!Directory.Exists(AppDataDir))
             Directory.CreateDirectory(AppDataDir);
+    }
+
+    /// <summary>
+    /// 原子写入文本文件：先写临时文件，再原子替换目标文件。
+    /// 避免写入过程中崩溃/断电导致文件损坏（0 字节或半截）。
+    /// </summary>
+    private static void WriteAllTextAtomic(string path, string content)
+    {
+        EnsureDirectory();
+        var temp = path + ".tmp";
+        File.WriteAllText(temp, content);
+        if (File.Exists(path))
+        {
+            // File.Replace 在同卷内是原子操作，且要求目标文件已存在。
+            File.Replace(temp, path, destinationBackupFileName: null);
+        }
+        else
+        {
+            File.Move(temp, path);
+        }
     }
 
     /// <summary>
@@ -71,9 +95,8 @@ public static class StorageService
     /// </summary>
     public static void SaveUrls(UrlCollectionData data)
     {
-        EnsureDirectory();
         string json = JsonSerializer.Serialize(data, JsonOptions);
-        File.WriteAllText(UrlsFilePath, json);
+        WriteAllTextAtomic(UrlsFilePath, json);
     }
 
     /// <summary>
@@ -104,9 +127,8 @@ public static class StorageService
     /// </summary>
     public static void SaveSnippets(SnippetCollectionData data)
     {
-        EnsureDirectory();
         string json = JsonSerializer.Serialize(data, JsonOptions);
-        File.WriteAllText(SnippetsFilePath, json);
+        WriteAllTextAtomic(SnippetsFilePath, json);
     }
 
     /// <summary>
@@ -122,12 +144,26 @@ public static class StorageService
     }
 
     /// <summary>
-    /// 保存密码库 (Base64 文本)。
+    /// 保存密码库 (Base64 文本)。保存前自动备份当前版本到 .bak 文件。
     /// </summary>
     public static void SaveVault(string base64Data)
     {
-        EnsureDirectory();
-        File.WriteAllText(VaultFilePath, base64Data);
+        // 保存前备份当前版本，便于误操作后回退
+        if (File.Exists(VaultFilePath))
+        {
+            try { File.Copy(VaultFilePath, VaultBackupFilePath, overwrite: true); }
+            catch { /* 备份失败不阻止保存 */ }
+        }
+        WriteAllTextAtomic(VaultFilePath, base64Data);
+    }
+
+    /// <summary>从自动备份恢复密码库文件内容。备份不存在返回 null。</summary>
+    public static string? LoadVaultBackup()
+    {
+        if (!File.Exists(VaultBackupFilePath))
+            return null;
+        string content = File.ReadAllText(VaultBackupFilePath);
+        return string.IsNullOrWhiteSpace(content) ? null : content;
     }
 
     /// <summary>判断密码库文件是否已存在。</summary>

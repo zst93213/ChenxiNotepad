@@ -81,14 +81,10 @@ public static class UpdateService
     }
 
     /// <summary>当前应用可执行文件所在目录。</summary>
-    public static string AppDir =>
-        Path.GetDirectoryName(Process.GetCurrentProcess().MainModule?.FileName)
-        ?? AppContext.BaseDirectory;
+    public static string AppDir => AppContext.BaseDirectory;
 
     /// <summary>当前应用可执行文件完整路径。</summary>
-    public static string AppExePath =>
-        Process.GetCurrentProcess().MainModule?.FileName
-        ?? Path.Combine(AppContext.BaseDirectory, "SuixinJi.exe");
+    public static string AppExePath => Path.Combine(AppContext.BaseDirectory, "SuixinJi.exe");
 
     /// <summary>从 GitHub 获取最新 Release 信息。失败返回 null。</summary>
     public static async Task<ReleaseInfo?> FetchLatestReleaseAsync(string repoOwner, string repoName)
