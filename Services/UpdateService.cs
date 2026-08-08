@@ -68,16 +68,32 @@ public static class UpdateService
         public List<ReleaseAsset> Assets { get; set; } = new();
     }
 
-    /// <summary>获取当前应用版本号。</summary>
+    /// <summary>获取当前应用版本号。
+    /// 注意：AssemblyInformationalVersion 在发布构建中会带上 "+<commit>" 后缀，
+    /// 必须先去掉 '+' 之后的信息段，再参与版本比较，否则 Version.TryParse 失败会退化为字符串比较，
+    /// 导致远程 "v2.4.5" 被错误地判定为比本地 "2.4.5+abcdef" 更新，出现更新成功后反复提示更新的死循环。
+    /// </summary>
     public static string CurrentVersion
     {
         get
         {
             var asm = Assembly.GetEntryAssembly();
             var ver = asm?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-            if (!string.IsNullOrEmpty(ver)) return ver;
-            return asm?.GetName().Version?.ToString() ?? "1.0.0";
+            if (!string.IsNullOrEmpty(ver)) return StripInformationalVersionSuffix(ver);
+            return StripInformationalVersionSuffix(asm?.GetName().Version?.ToString() ?? "1.0.0");
         }
+    }
+
+    /// <summary>
+    /// 去除 InformationalVersion 中 '+' 及后续的构建元数据（git commit 哈希），
+    /// 只保留严格的 x.y.z.prerelease 部分供 Version 解析。
+    /// </summary>
+    private static string StripInformationalVersionSuffix(string version)
+    {
+        if (string.IsNullOrEmpty(version)) return "1.0.0";
+        var plus = version.IndexOf('+');
+        if (plus > 0) version = version.Substring(0, plus);
+        return version.Trim();
     }
 
     /// <summary>当前应用可执行文件所在目录。</summary>
@@ -110,12 +126,14 @@ public static class UpdateService
         }
     }
 
-    /// <summary>比较版本号。返回 true 表示 remote 比 local 新。</summary>
+    /// <summary>比较版本号。返回 true 表示 remote 比 local 新。
+    /// 已自动处理两边的 'v' 前缀以及 InformationalVersion 的 "+<commit>" 后缀。
+    /// </summary>
     public static bool IsNewerVersion(string localVersion, string remoteTag)
     {
-        // 去掉 'v' 前缀
-        var local = localVersion.TrimStart('v', 'V');
-        var remote = remoteTag.TrimStart('v', 'V');
+        // 去掉 'v' 前缀，同时去掉 +commit 构建元数据
+        var local = StripInformationalVersionSuffix(localVersion ?? "").TrimStart('v', 'V');
+        var remote = StripInformationalVersionSuffix(remoteTag ?? "").TrimStart('v', 'V');
 
         if (Version.TryParse(local, out var localVer) && Version.TryParse(remote, out var remoteVer))
         {
@@ -247,21 +265,26 @@ call :LOG AppDir: %APPDIR%
 call :LOG NewFilesDir: %NEWDIR%
 call :LOG CurrentPID: %PID%
 
-REM 1. 等待旧进程退出（超时 120 秒）
+REM 1. 等待旧进程退出（超时 30 秒；每 1 秒检查一次）
+set /A MAXWAITS=30
 set WAITS=0
 :waitloop
-tasklist /FI ""PID eq %PID%"" /NH 2>nul | find ""%PID%"" >nul
+REM 使用 wmic 精确检查指定 PID 是否还存在（比 tasklist+find 更可靠，不会误匹配包含该数字的其他进程）
+wmic process where "ProcessId='%PID%'" get ProcessId 2>nul | find ""%PID%"" >nul
 if %errorlevel%==0 (
-    ping -n 2 127.0.0.1 >nul
+    timeout /t 1 /nobreak >nul
     set /A WAITS+=1
-    if !WAITS! GEQ 60 (
-        call :LOG WARN: timed out waiting for process exit, continuing anyway.
+    if !WAITS! GEQ %MAXWAITS% (
+        call :LOG WARN: timed out waiting %MAXWAITS%s for PID %PID% to exit, continuing anyway (will kill it).
+        REM 超时后强制杀掉，避免后续文件被占用导致复制失败
+        taskkill /F /PID %PID% /T >nul 2>&1
+        timeout /t 2 /nobreak >nul
         goto endwait
     )
     goto waitloop
 )
 :endwait
-call :LOG Old process has exited.
+call :LOG Old process has exited or was killed. waited=%WAITS%s.
 
 REM 2. 清理旧版本文件（保留 data 目录；保留子目录结构，因为 data/ 存放用户数据）
 call :LOG Step 2: Cleaning old files in %APPDIR% while preserving data/

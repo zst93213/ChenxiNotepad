@@ -12,6 +12,18 @@ public static class ChangelogService
             随心记 更新日志
             ================
 
+            v2.4.6 (2026-08-08)
+            ─────────────────
+            [修复] 自动更新死循环：发布构建中 AssemblyInformationalVersion 带有 "+<commit>" 后缀（例
+                   如 "2.4.5+325fd32"），Version.TryParse 无法解析而退化为字符串比较，导致
+                   "v2.4.5" vs "2.4.5+xxx" 比较后仍被判定为"有新版本"，新程序每次启动都会重
+                   复提示更新。修复：CurrentVersion 和 IsNewerVersion 统一先去掉 '+' 及后
+                   缀，再按 Version 类强类型比较。
+            [修复] 更新 bat 等待进程退出更可靠：用 wmic process where ProcessId= 精准确认 PID
+                   是否存活（tasklist|find 会误匹配包含同数字的其他进程）；等待间隔改为 1 秒
+                   （timeout 命令更精确）；最大等待 30 秒，超时后 taskkill /F 强制杀掉主进
+                   程，避免占用中的 exe 复制失败又无声无息。
+
             v2.4.5 (2026-08-08)
             ─────────────────
             [修复] Ctrl+6 切换到记账模块出现空引用异常：SwitchToModule 整体加 try-catch 兜底，快捷键切换用 SafeSet 包装；出现异常写入 data/error.log 不再崩溃弹窗
