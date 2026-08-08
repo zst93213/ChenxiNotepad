@@ -15,7 +15,10 @@
         <Color x:Key="PinkDeep">#FFAD1457</Color>
         <Color x:Key="PinkSoft">#FFFDF2F8</Color>
 
-        <!-- PinkDeep 的画刷资源（Color 不能直接用于 Brush 属性） -->
+        <!-- 各 Color 对应的画刷资源（Color 不能直接用于 Brush 属性） -->
+        <SolidColorBrush x:Key="PinkPrimaryBrush" Color="{StaticResource PinkPrimary}"/>
+        <SolidColorBrush x:Key="PinkMediumBrush" Color="{StaticResource PinkMedium}"/>
+        <SolidColorBrush x:Key="PinkAccentBrush" Color="{StaticResource PinkAccent}"/>
         <SolidColorBrush x:Key="PinkDeepBrush" Color="{StaticResource PinkDeep}"/>
 
         <!-- 渐变画刷 -->
@@ -95,11 +98,11 @@
             <Setter Property="FontWeight" Value="Normal"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{StaticResource PinkMedium}"/>
+                    <Setter Property="Background" Value="{StaticResource PinkMediumBrush}"/>
                     <Setter Property="FontWeight" Value="Bold"/>
                 </Trigger>
                 <Trigger Property="IsHighlighted" Value="True">
-                    <Setter Property="Background" Value="{StaticResource PinkMedium}"/>
+                    <Setter Property="Background" Value="{StaticResource PinkMediumBrush}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -155,10 +158,10 @@
         <Style TargetType="TextBox">
             <Setter Property="Background" Value="#FFFFFFFF"/>
             <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource PinkMedium}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource PinkMediumBrush}"/>
             <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="Padding" Value="8,5"/>
-            <Setter Property="CaretBrush" Value="{StaticResource PinkPrimary}"/>
+            <Setter Property="CaretBrush" Value="{StaticResource PinkPrimaryBrush}"/>
             <Setter Property="SelectionBrush" Value="{StaticResource SelectionBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -177,11 +180,11 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="textBoxBorder" Property="BorderBrush"
-                                        Value="{StaticResource PinkAccent}"/>
+                                        Value="{StaticResource PinkAccentBrush}"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="textBoxBorder" Property="BorderBrush"
-                                        Value="{StaticResource PinkPrimary}"/>
+                                        Value="{StaticResource PinkPrimaryBrush}"/>
                                 <Setter TargetName="textBoxBorder" Property="BorderThickness" Value="2"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -196,10 +199,10 @@
         <Style TargetType="PasswordBox">
             <Setter Property="Background" Value="#FFFFFFFF"/>
             <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource PinkMedium}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource PinkMediumBrush}"/>
             <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="Padding" Value="8,5"/>
-            <Setter Property="CaretBrush" Value="{StaticResource PinkPrimary}"/>
+            <Setter Property="CaretBrush" Value="{StaticResource PinkPrimaryBrush}"/>
             <Setter Property="SelectionBrush" Value="{StaticResource SelectionBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -218,11 +221,11 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="pwdBorder" Property="BorderBrush"
-                                        Value="{StaticResource PinkAccent}"/>
+                                        Value="{StaticResource PinkAccentBrush}"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="pwdBorder" Property="BorderBrush"
-                                        Value="{StaticResource PinkPrimary}"/>
+                                        Value="{StaticResource PinkPrimaryBrush}"/>
                                 <Setter TargetName="pwdBorder" Property="BorderThickness" Value="2"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -236,7 +239,7 @@
         <!-- ================================================================ -->
         <Style TargetType="ListBox">
             <Setter Property="Background" Value="#66FFFFFF"/>
-            <Setter Property="BorderBrush" Value="{StaticResource PinkMedium}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource PinkMediumBrush}"/>
             <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="Padding" Value="4"/>
             <Setter Property="Template">
@@ -290,7 +293,7 @@
         <!-- ================================================================ -->
         <Style TargetType="TreeView">
             <Setter Property="Background" Value="#66FFFFFF"/>
-            <Setter Property="BorderBrush" Value="{StaticResource PinkMedium}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource PinkMediumBrush}"/>
             <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -348,7 +351,7 @@
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="radioBorder" Property="BorderBrush"
-                                        Value="{StaticResource PinkPrimary}"/>
+                                        Value="{StaticResource PinkPrimaryBrush}"/>
                                 <Setter TargetName="radioBorder" Property="Background"
                                         Value="#30FCE4EC"/>
                                 <Setter Property="FontWeight" Value="Bold"/>
@@ -381,7 +384,7 @@
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="#FFFFFFFF"/>
             <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource PinkMedium}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource PinkMediumBrush}"/>
             <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="Padding" Value="8,5"/>
         </Style>
@@ -424,21 +427,21 @@
 
         <Style TargetType="ScrollBar">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{StaticResource PinkMedium}"/>
+            <Setter Property="Foreground" Value="{StaticResource PinkMediumBrush}"/>
         </Style>
 
         <!-- ================================================================ -->
         <!-- GridSplitter 样式 -->
         <!-- ================================================================ -->
         <Style TargetType="GridSplitter">
-            <Setter Property="Background" Value="{StaticResource PinkMedium}"/>
+            <Setter Property="Background" Value="{StaticResource PinkMediumBrush}"/>
         </Style>
 
         <!-- ================================================================ -->
         <!-- Separator 样式 -->
         <!-- ================================================================ -->
         <Style TargetType="Separator">
-            <Setter Property="Background" Value="{StaticResource PinkMedium}"/>
+            <Setter Property="Background" Value="{StaticResource PinkMediumBrush}"/>
             <Setter Property="Margin" Value="8,3"/>
         </Style>
 
