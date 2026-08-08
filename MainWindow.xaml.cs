@@ -450,13 +450,19 @@ public partial class MainWindow : Window
     {
         if (mainMenu is null) return;
         mainMenu.Visibility = Visibility.Visible;
-        Announce("菜单已显示，按 ALT 或 ESC 关闭。");
+        // 聚焦第一个菜单项，使方向键和字母助记键可用
+        if (mainMenu.Items.Count > 0 && mainMenu.Items[0] is MenuItem firstItem)
+        {
+            firstItem.Focus();
+        }
     }
 
     private void HideMainMenu()
     {
         if (mainMenu is null) return;
         mainMenu.Visibility = Visibility.Collapsed;
+        // 焦点回到当前模块的列表
+        FocusList();
     }
 
     // =========================================================================
@@ -1207,58 +1213,9 @@ public partial class MainWindow : Window
 
     private void UpdateStatus()
     {
-        var moduleText = _currentModule switch
-        {
-            Module.Url => "网址收藏",
-            Module.Snippet => "记事本",
-            Module.Password => "密码收藏",
-            Module.Note => "日记",
-            Module.IdDocument => "证件保存",
-            Module.Accounting => "记账",
-            _ => ""
-        };
-
-        if ((_currentModule == Module.Password || _currentModule == Module.Note || _currentModule == Module.IdDocument || _currentModule == Module.Accounting) && !_isUnlocked)
-        {
-            statusPositionText.Text = $"{moduleText} | 未解锁";
-            statusHintText.Text = "输入主密码后按回车解锁";
-            return;
-        }
-
-        var filterText = _currentFilter is null ? "全部" : _currentFilter;
-        var count = _currentModule switch
-        {
-            Module.Url => _filteredUrls.Count,
-            Module.Snippet => _filteredSnippets.Count,
-            Module.Password => _filteredPasswords.Count,
-            Module.Note => _filteredNotes.Count,
-            Module.IdDocument => _filteredIdDocuments.Count,
-            Module.Accounting => _filteredAccountings.Count,
-            _ => 0
-        };
-        var index = _currentModule switch
-        {
-            Module.Url => urlListBox.SelectedIndex,
-            Module.Snippet => snippetListBox.SelectedIndex,
-            Module.Password => passwordListBox.SelectedIndex,
-            Module.Note => noteListBox.SelectedIndex,
-            Module.IdDocument => idDocumentListBox.SelectedIndex,
-            Module.Accounting => accountingListBox.SelectedIndex,
-            _ => 0
-        };
-        statusPositionText.Text = count == 0
-            ? $"{moduleText} | {filterText} | 共 0 项"
-            : $"{moduleText} | {filterText} | 第 {index + 1} 项，共 {count} 项";
-
-        statusHintText.Text = _currentModule switch
-        {
-            Module.Url => "Enter 打开 Ctrl+Enter 复制 Del 删除 F2 编辑 Ctrl+Shift+F 收藏 Ctrl+Shift+O 排序",
-            Module.Snippet => "Enter 编辑 Ctrl+Shift+C 复制内容 Ctrl+Shift+I 模板 Del 删除 F2 编辑 Ctrl+Shift+O 排序 Ctrl+Shift+X 导出",
-            Module.Password => "Ctrl+Shift+C 复制密码 Del 删除 F2 编辑 Ctrl+Shift+L 锁定",
-            Module.Note => "Enter 编辑 Ctrl+Shift+M 按月浏览 Del 删除 F2 编辑 Ctrl+Shift+F 收藏 Ctrl+Shift+X 导出",
-            Module.Accounting => "Enter 编辑 Ctrl+Shift+S 播报统计 Del 删除 F2 编辑 Ctrl+Shift+F 收藏 Ctrl+Shift+O 排序",
-            _ => ""
-        };
+        // 活动区内容暂时全部清空，等用户后续指示再添加
+        statusPositionText.Text = "";
+        statusHintText.Text = "";
     }
 
     private void Announce(string message)
@@ -1278,25 +1235,21 @@ public partial class MainWindow : Window
 
         var ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
         var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
-        var alt = Keyboard.Modifiers.HasFlag(ModifierKeys.Alt);
-        bool isAltKey = e.Key == Key.LeftAlt || e.Key == Key.RightAlt || e.SystemKey == Key.LeftAlt || e.SystemKey == Key.RightAlt;
 
-        // ALT 键（单独按下）：切换主菜单栏可见性
-        if (!ctrl && !shift && (isAltKey || e.Key == Key.System))
+        // ALT 单键（不组合 Ctrl/Shift）：切换主菜单栏显示/隐藏
+        // WPF 中按 ALT 时 e.Key == Key.System，e.SystemKey == Key.LeftAlt/RightAlt
+        if (!ctrl && !shift && e.Key == Key.System &&
+            (e.SystemKey == Key.LeftAlt || e.SystemKey == Key.RightAlt))
         {
-            // 真正只有 ALT 键（不组合）时触发菜单切换
-            if (isAltKey || (!alt && e.Key == Key.LeftAlt) || (!alt && e.Key == Key.RightAlt))
-            {
-                e.Handled = true;
-                ToggleMainMenu();
-                return;
-            }
+            e.Handled = true;
+            ToggleMainMenu();
+            return;
         }
 
         // ESC：如果菜单开着先关掉菜单，其他场景交给后续逻辑
-        if (!ctrl && !shift && !alt && e.Key == Key.Escape)
+        if (!ctrl && !shift && e.Key == Key.Escape)
         {
-            if (mainMenu.Visibility == Visibility.Visible)
+            if (mainMenu != null && mainMenu.Visibility == Visibility.Visible)
             {
                 e.Handled = true;
                 HideMainMenu();

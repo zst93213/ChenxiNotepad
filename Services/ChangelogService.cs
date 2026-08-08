@@ -12,6 +12,14 @@ public static class ChangelogService
             随心记 更新日志
             ================
 
+            v2.4.7 (2026-08-08)
+            ─────────────────
+            [修复] ALT 菜单找回：上一版错误地给 Menu 和所有 MenuItem 加了 Focusable=False /
+                   IsTabStop=False，导致菜单即使显示也无法接收焦点和操作。现已移除这些限制，
+                   保留 Visibility=Collapsed（默认隐藏，TAB 不可达）；按 ALT 时显示并聚焦
+                   第一个菜单项，可用方向键/TAB/字母助记键正常导航；再按 ALT 或 ESC 隐藏。
+            [优化] 活动区（状态栏）内容暂时全部清空，等后续指示再添加
+
             v2.4.6 (2026-08-08)
             ─────────────────
             [修复] 自动更新死循环：发布构建中 AssemblyInformationalVersion 带有 "+<commit>" 后缀（例

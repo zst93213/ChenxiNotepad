@@ -10,11 +10,11 @@
         Loaded="Window_Loaded"
         Closing="Window_Closing">
     <DockPanel>
-        <!-- 顶部菜单栏：默认隐藏，按 ALT 才显示；再次按 ALT 或 ESC 隐藏 -->
+        <!-- 顶部菜单栏：默认隐藏（Collapsed），按 ALT 显示；再按 ALT 或 ESC 隐藏。
+             Collapsed 时 TAB 不可达；Visible 时可用方向键/TAB 导航菜单项。 -->
         <Menu x:Name="mainMenu" DockPanel.Dock="Top" Visibility="Collapsed"
-              KeyboardNavigation.IsTabStop="False" Focusable="False"
               AutomationProperties.Name="主菜单">
-            <MenuItem Header="文件(_F)" AutomationProperties.Name="文件菜单" KeyboardNavigation.IsTabStop="False">
+            <MenuItem Header="文件(_F)" AutomationProperties.Name="文件菜单">
                 <MenuItem Header="新建(_N)" InputGestureText="Ctrl+N" Click="OnNew" AutomationProperties.Name="新建条目"/>
                 <MenuItem Header="保存(_S)" InputGestureText="Ctrl+S" Click="OnSave" AutomationProperties.Name="保存"/>
                 <Separator/>
@@ -30,7 +30,7 @@
                 <Separator/>
                 <MenuItem Header="退出(_X)" Click="OnExit" AutomationProperties.Name="退出程序"/>
             </MenuItem>
-            <MenuItem Header="编辑(_E)" AutomationProperties.Name="编辑菜单" KeyboardNavigation.IsTabStop="False">
+            <MenuItem Header="编辑(_E)" AutomationProperties.Name="编辑菜单">
                 <MenuItem Header="编辑(_E)" InputGestureText="Ctrl+E / F2" Click="OnEdit" AutomationProperties.Name="编辑条目"/>
                 <MenuItem Header="删除(_D)" InputGestureText="Ctrl+D / Del" Click="OnDelete" AutomationProperties.Name="删除条目"/>
                 <MenuItem Header="搜索(_R)" InputGestureText="Ctrl+F" Click="OnSearch" AutomationProperties.Name="搜索"/>
@@ -43,7 +43,7 @@
                 <MenuItem Header="切换排序(_O)" InputGestureText="Ctrl+Shift+O" Click="OnToggleSort" AutomationProperties.Name="切换排序模式"/>
                 <MenuItem Header="导出TXT(_X)" InputGestureText="Ctrl+Shift+X" Click="OnExportTxt" AutomationProperties.Name="导出为文本文件"/>
             </MenuItem>
-            <MenuItem Header="视图(_V)" AutomationProperties.Name="视图菜单" KeyboardNavigation.IsTabStop="False">
+            <MenuItem Header="视图(_V)" AutomationProperties.Name="视图菜单">
                 <MenuItem Header="网址收藏(_1)" InputGestureText="Ctrl+1" Click="OnSwitchUrl" AutomationProperties.Name="切换到网址收藏"/>
                 <MenuItem Header="记事本(_2)" InputGestureText="Ctrl+2" Click="OnSwitchSnippet" AutomationProperties.Name="切换到记事本"/>
                 <MenuItem Header="密码收藏(_3)" InputGestureText="Ctrl+3" Click="OnSwitchPassword" AutomationProperties.Name="切换到密码收藏"/>
@@ -53,7 +53,7 @@
                 <Separator/>
                 <MenuItem Header="切换焦点区域(_G)" InputGestureText="F6" Click="OnCycleFocus" AutomationProperties.Name="在分类树/列表/详情之间切换焦点"/>
             </MenuItem>
-            <MenuItem Header="操作(_O)" AutomationProperties.Name="操作菜单" KeyboardNavigation.IsTabStop="False">
+            <MenuItem Header="操作(_O)" AutomationProperties.Name="操作菜单">
                 <MenuItem Header="打开网址(_O)" InputGestureText="Enter" Click="OnOpenUrl" AutomationProperties.Name="用默认浏览器打开网址"/>
                 <MenuItem Header="复制网址(_C)" InputGestureText="Ctrl+Enter" Click="OnCopyUrl" AutomationProperties.Name="复制网址到剪贴板"/>
                 <Separator/>
@@ -70,14 +70,14 @@
                 <MenuItem Header="锁定密码库(_L)" InputGestureText="Ctrl+Shift+L" Click="OnLock" AutomationProperties.Name="锁定密码库"/>
                 <MenuItem Header="密码生成器(_G)" InputGestureText="F5" Click="OnPasswordGenerator" AutomationProperties.Name="打开密码生成器"/>
             </MenuItem>
-            <MenuItem Header="工具(_T)" AutomationProperties.Name="工具菜单" KeyboardNavigation.IsTabStop="False">
+            <MenuItem Header="工具(_T)" AutomationProperties.Name="工具菜单">
                 <MenuItem Header="重复检测(_D)" Click="OnDuplicateCheck" AutomationProperties.Name="检测重复网址和密码"/>
                 <MenuItem Header="网址健康检查(_H)" Click="OnUrlHealthCheck" AutomationProperties.Name="检查网址可访问性"/>
                 <MenuItem Header="分类管理(_C)" Click="OnCategoryManager" AutomationProperties.Name="管理分类和标签"/>
                 <MenuItem Header="查看审计日志(_A)" Click="OnViewAuditLog" AutomationProperties.Name="查看操作审计日志"/>
                 <MenuItem Header="快捷键设置(_K)" Click="OnShortcutConfig" AutomationProperties.Name="自定义快捷键"/>
             </MenuItem>
-            <MenuItem Header="帮助(_H)" AutomationProperties.Name="帮助菜单" KeyboardNavigation.IsTabStop="False">
+            <MenuItem Header="帮助(_H)" AutomationProperties.Name="帮助菜单">
                 <MenuItem Header="快捷键说明(_K)" Click="OnHelpShortcuts" AutomationProperties.Name="快捷键说明"/>
                 <MenuItem Header="检查更新(_U)" Click="OnCheckUpdate" AutomationProperties.Name="检查应用更新"/>
                 <MenuItem Header="更新日志(_L)" Click="OnViewChangelog" AutomationProperties.Name="查看更新日志"/>
@@ -124,11 +124,10 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" x:Name="statusPositionText"
-                       Text="就绪" VerticalAlignment="Center" Margin="8,0" Focusable="False"
+                       Text="" VerticalAlignment="Center" Margin="8,0" Focusable="False"
                        AutomationProperties.Name="当前位置"/>
             <TextBlock Grid.Column="1" x:Name="statusHintText"
-                       Text="Ctrl+1 网址 Ctrl+2 记事本 Ctrl+3 密码 Ctrl+4 日记 Ctrl+5 证件 Ctrl+6 记账 F6 切换区域"
-                       VerticalAlignment="Center" Margin="12,0" Focusable="False"
+                       Text="" VerticalAlignment="Center" Margin="12,0" Focusable="False"
                        AutomationProperties.Name="快捷键提示"/>
             <TextBlock Grid.Column="2" x:Name="statusMessageText"
                        Text="" HorizontalAlignment="Right" VerticalAlignment="Center"
