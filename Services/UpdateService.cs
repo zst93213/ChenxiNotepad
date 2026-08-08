@@ -233,13 +233,14 @@ public static class UpdateService
         var batPath = Path.Combine(tempDir, $"suixinji_update_{pid}.bat");
 
         var batContent = $@"@echo off
+chcp 65001 >nul
 echo Updating SuixinJi, please wait...
 
-REM 等待旧进程退出
+REM 等待旧进程退出（tasklist 过滤器语法必须为 "PID eq <pid>"）
 :waitloop
-tasklist /FI ""PID {pid}"" 2>nul | find ""{pid}"" >nul
+tasklist /FI ""PID eq {pid}"" /NH 2>nul | find ""{pid}"" >nul
 if %errorlevel%==0 (
-    timeout /t 1 /nobreak >nul
+    ping -n 2 127.0.0.1 >nul
     goto waitloop
 )
 
@@ -261,7 +262,9 @@ REM 删除自身
 del /q ""{batPath}"" 2>nul
 ";
 
-        File.WriteAllText(batPath, batContent, System.Text.Encoding.ASCII);
+        // 使用 UTF-8 (无 BOM) 写入 bat，并配合 chcp 65001 切到 UTF-8 代码页，
+        // 以正确支持路径中可能出现的中文（如 Windows 用户名为中文）。
+        File.WriteAllText(batPath, batContent, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
 
         var startInfo = new ProcessStartInfo
         {
