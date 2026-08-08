@@ -4,20 +4,17 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
+using BlindNotepad.Services;
 
 namespace BlindNotepad
 {
     /// <summary>
-    /// 应用程序入口：注册未捕获异常处理并初始化存储目录。
+    /// 应用程序入口：注册未捕获异常处理、初始化存储目录并触发旧数据迁移。
     /// </summary>
     public partial class App : Application
     {
-        private const string AppDataFolderName = "SuixinJi";
-
-        /// <summary>错误日志文件路径（与密码库同目录）。</summary>
-        private static readonly string ErrorLogPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            AppDataFolderName, "error.log");
+        /// <summary>错误日志文件路径（与用户数据同目录，见 StorageService.AppDataDir）。</summary>
+        private static string ErrorLogPath => Path.Combine(StorageService.AppDataDir, "error.log");
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -26,7 +23,9 @@ namespace BlindNotepad
             AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
-            InitializeStorageDirectory();
+            // 触发 StorageService 静态初始化以确定最终数据目录；
+            // 同时把 %LocalAppData%/SuixinJi 下的旧数据搬过来。
+            StorageService.MigrateLegacyDataIfNeeded();
 
             base.OnStartup(e);
         }
@@ -70,7 +69,7 @@ namespace BlindNotepad
 
             // 弹框提示用户，并告知日志位置。
             string message = exception != null
-                ? $"{exception.Message}\r\n\r\n详细错误已记录到：\r\n{ErrorLogPath}"
+                ? $"{exception.Message}\r\n\r\n详细错误已记录到：\r\n{ErrorLogPath}\r\n\r\n用户数据目录：\r\n{StorageService.AppDataDir}"
                 : "发生未知异常。";
 
             try
@@ -80,24 +79,6 @@ namespace BlindNotepad
             catch
             {
                 // 弹框本身失败时忽略，避免在异常处理流程中再次抛出。
-            }
-        }
-
-        /// <summary>
-        /// 初始化本地应用数据存储目录。
-        /// </summary>
-        private static void InitializeStorageDirectory()
-        {
-            try
-            {
-                string path = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    AppDataFolderName);
-                Directory.CreateDirectory(path);
-            }
-            catch
-            {
-                // 创建失败时忽略，不阻止应用启动。
             }
         }
     }

@@ -31,42 +31,42 @@
 
         <!-- 说明 -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
-            <Label Content="说明(_D):" Target="{Binding ElementName=titleBox}" AutomationProperties.Name="说明标签"/>
-            <TextBox x:Name="titleBox" Width="300" AutomationProperties.Name="记账说明"/>
+            <Label Content="说明(_D):" Target="{Binding ElementName=titleBox}" AutomationProperties.Name="说明"/>
+            <TextBox x:Name="titleBox" Width="300" AutomationProperties.Name="说明"/>
         </StackPanel>
 
         <!-- 金额 -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
-            <Label Content="金额(_A):" Target="{Binding ElementName=amountBox}" AutomationProperties.Name="金额标签"/>
+            <Label Content="金额(_A):" Target="{Binding ElementName=amountBox}" AutomationProperties.Name="金额"/>
             <TextBox x:Name="amountBox" Width="150" PreviewTextInput="OnAmountPreviewInput"
-                     AutomationProperties.Name="金额输入框，请输入数字"/>
+                     AutomationProperties.Name="金额"/>
             <Label Content="元" Margin="4,0,0,0" AutomationProperties.Name="元"/>
         </StackPanel>
 
         <!-- 分类 -->
         <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,8">
-            <Label Content="分类(_C):" Target="{Binding ElementName=categoryBox}" AutomationProperties.Name="分类标签"/>
+            <Label Content="分类(_C):" Target="{Binding ElementName=categoryBox}" AutomationProperties.Name="分类"/>
             <ComboBox x:Name="categoryBox" IsEditable="True" Width="200"
-                      AutomationProperties.Name="记账分类，可选择或输入"/>
+                      AutomationProperties.Name="分类"/>
         </StackPanel>
 
         <!-- 支付方式 -->
         <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,0,0,8">
-            <Label Content="支付方式(_P):" Target="{Binding ElementName=paymentMethodBox}" AutomationProperties.Name="支付方式标签"/>
+            <Label Content="支付方式(_P):" Target="{Binding ElementName=paymentMethodBox}" AutomationProperties.Name="支付方式"/>
             <ComboBox x:Name="paymentMethodBox" IsEditable="True" Width="160"
-                      AutomationProperties.Name="支付方式，可选择或输入"/>
+                      AutomationProperties.Name="支付方式"/>
         </StackPanel>
 
         <!-- 日期 -->
         <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,0,0,8">
-            <Label Content="日期(_E):" Target="{Binding ElementName=datePicker}" AutomationProperties.Name="日期标签"/>
+            <Label Content="日期(_E):" Target="{Binding ElementName=datePicker}" AutomationProperties.Name="日期"/>
             <DatePicker x:Name="datePicker" Width="150"
-                        AutomationProperties.Name="交易日期"/>
+                        AutomationProperties.Name="日期"/>
         </StackPanel>
 
         <!-- 备注 -->
         <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="0,0,0,4">
-            <Label Content="备注(_N):" AutomationProperties.Name="备注标签"/>
+            <Label Content="备注(_N):" AutomationProperties.Name="备注"/>
         </StackPanel>
         <TextBox Grid.Row="6" x:Name="noteBox" Margin="0,24,0,8"
                  AcceptsReturn="True" TextWrapping="Wrap" Height="60"

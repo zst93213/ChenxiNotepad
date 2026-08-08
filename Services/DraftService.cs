@@ -6,7 +6,7 @@ namespace BlindNotepad.Services;
 
 /// <summary>
 /// 草稿自动保存服务。为记事本和日记模块提供定时草稿保存与恢复。
-/// 草稿文件存储于 %LocalAppData%/SuixinJi/drafts/ 目录。
+/// 草稿文件存储于程序目录下的 data/drafts/ 目录（用户能直接找到）。
 /// </summary>
 public static class DraftService
 {

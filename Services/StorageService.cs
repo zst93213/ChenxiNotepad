@@ -7,15 +7,113 @@ namespace BlindNotepad.Services;
 /// <summary>
 /// 存储服务: 负责网址收藏 (urls.json, 明文 JSON)、文案收藏 (snippets.json, 明文 JSON) 与密码库
 /// (passwords.bnvault, 加密 Base64 文本) 的读写, 以及 RFC 6238 TOTP 生成。
-/// 存储目录: %LocalAppData%/SuixinJi
+/// 存储目录: 应用安装目录下的 data/（用户好找；同时保留从旧位置 %LocalAppData%/SuixinJi 自动迁移）。
 /// (System / System.Collections.Generic / System.IO 由 ImplicitUsings 提供。)
 /// </summary>
 public static class StorageService
 {
-    /// <summary>应用数据根目录。</summary>
-    public static readonly string AppDataDir = Path.Combine(
+    /// <summary>旧数据目录 (%LocalAppData%/SuixinJi)。首次启动时若存在会自动迁移到新目录。</summary>
+    public static readonly string LegacyAppDataDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "SuixinJi");
+
+    /// <summary>
+    /// 新数据目录 (AppContext.BaseDirectory/data)，位于可执行文件旁边，用户能直接找到。
+    /// 若可执行文件目录不可写（例如安装到 Program Files），则回退到 LegacyAppDataDir。
+    /// </summary>
+    public static readonly string AppDataDir = ResolveAppDataDir();
+
+    /// <summary>
+    /// 选择最终数据目录：优先 AppDir/data；若该路径不可写则退回旧目录并输出警告。
+    /// </summary>
+    private static string ResolveAppDataDir()
+    {
+        var primary = Path.Combine(UpdateService.AppDir, "data");
+        try
+        {
+            // 可写性测试：确保目录存在并尝试创建一个测试文件后删除
+            if (!Directory.Exists(primary))
+                Directory.CreateDirectory(primary);
+            var probe = Path.Combine(primary, $".write_test_{Guid.NewGuid():N}");
+            using (File.Create(probe, 1)) { }
+            File.Delete(probe);
+            return primary;
+        }
+        catch
+        {
+            // 安装在 Program Files 等不可写位置的兜底
+            return LegacyAppDataDir;
+        }
+    }
+
+    /// <summary>
+    /// 在首次存取前，若用户已有旧数据目录 (LegacyAppDataDir)，
+    /// 把所有已知文件搬到新目录中（同名文件不覆盖以避免丢失新数据）。
+    /// </summary>
+    public static void MigrateLegacyDataIfNeeded()
+    {
+        try
+        {
+            if (AppDataDir == LegacyAppDataDir) return; // 没切换位置，无需迁移
+            if (!Directory.Exists(LegacyAppDataDir)) return;
+
+            // ---- 1. 迁移所有已知的独立文件 ----
+            var knownFiles = new[]
+            {
+                UrlsFileName, SnippetsFileName, VaultFileName, VaultBackupFileName,
+                "error.log", "settings.json", "audit.json", "drafts.json",
+                "shortcuts.json"
+            };
+            bool migratedAny = false;
+            foreach (var name in knownFiles)
+            {
+                var src = Path.Combine(LegacyAppDataDir, name);
+                if (!File.Exists(src)) continue;
+                var dst = Path.Combine(AppDataDir, name);
+                if (File.Exists(dst)) continue; // 新目录已有则不覆盖
+                var dstDir = Path.GetDirectoryName(dst);
+                if (!string.IsNullOrEmpty(dstDir) && !Directory.Exists(dstDir))
+                    Directory.CreateDirectory(dstDir);
+                File.Copy(src, dst, overwrite: false);
+                migratedAny = true;
+            }
+
+            // ---- 2. 迁移 drafts/ 子目录（草稿自动保存的文件） ----
+            var oldDraftsDir = Path.Combine(LegacyAppDataDir, "drafts");
+            var newDraftsDir = Path.Combine(AppDataDir, "drafts");
+            if (Directory.Exists(oldDraftsDir))
+            {
+                try
+                {
+                    if (!Directory.Exists(newDraftsDir))
+                        Directory.CreateDirectory(newDraftsDir);
+                    foreach (var draftFile in Directory.GetFiles(oldDraftsDir))
+                    {
+                        var fileName = Path.GetFileName(draftFile);
+                        var dst = Path.Combine(newDraftsDir, fileName);
+                        if (!File.Exists(dst))
+                        {
+                            File.Copy(draftFile, dst, overwrite: false);
+                            migratedAny = true;
+                        }
+                    }
+                }
+                catch { /* 某个草稿迁移失败不影响整体 */ }
+            }
+
+            // ---- 3. 迁移其他已知的子目录：如果将来再加子目录可继续在此扩展 ----
+
+            if (migratedAny)
+            {
+                // 迁移完成后把旧目录重命名为 .old，避免下次再次迁移
+                try { Directory.Move(LegacyAppDataDir, LegacyAppDataDir + ".old"); } catch { }
+            }
+        }
+        catch
+        {
+            // 迁移失败不阻止程序启动，用户下次手动搬也行
+        }
+    }
 
     /// <summary>网址数据文件名 (明文 JSON)。</summary>
     public const string UrlsFileName = "urls.json";

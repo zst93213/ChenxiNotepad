@@ -38,49 +38,49 @@
                 <Label Grid.Row="0" Grid.Column="0" Content="证件名称(_N):" Target="{Binding ElementName=titleBox}"
                        AutomationProperties.Name="证件名称"/>
                 <TextBox Grid.Row="0" Grid.Column="1" x:Name="titleBox" Margin="0,4"
-                         AutomationProperties.Name="证件名称输入框"/>
+                         AutomationProperties.Name="证件名称"/>
 
                 <!-- Row 1: 证件类型 -->
                 <Label Grid.Row="1" Grid.Column="0" Content="证件类型(_T):" Target="{Binding ElementName=docTypeBox}"
                        AutomationProperties.Name="证件类型"/>
                 <ComboBox Grid.Row="1" Grid.Column="1" x:Name="docTypeBox" IsEditable="True" Margin="0,4"
-                          AutomationProperties.Name="证件类型选择框，可编辑"/>
+                          AutomationProperties.Name="证件类型"/>
 
                 <!-- Row 2: 证件号码 -->
                 <Label Grid.Row="2" Grid.Column="0" Content="证件号码(_M):" Target="{Binding ElementName=docNumberBox}"
                        AutomationProperties.Name="证件号码"/>
                 <TextBox Grid.Row="2" Grid.Column="1" x:Name="docNumberBox" Margin="0,4"
-                         AutomationProperties.Name="证件号码输入框"/>
+                         AutomationProperties.Name="证件号码"/>
 
                 <!-- Row 3: 持有人 -->
                 <Label Grid.Row="3" Grid.Column="0" Content="持有人(_H):" Target="{Binding ElementName=holderNameBox}"
                        AutomationProperties.Name="持有人"/>
                 <TextBox Grid.Row="3" Grid.Column="1" x:Name="holderNameBox" Margin="0,4"
-                         AutomationProperties.Name="持有人输入框"/>
+                         AutomationProperties.Name="持有人"/>
 
                 <!-- Row 4: 签发日期 -->
                 <Label Grid.Row="4" Grid.Column="0" Content="签发日期(_I):" Target="{Binding ElementName=issueDatePicker}"
                        AutomationProperties.Name="签发日期"/>
                 <DatePicker Grid.Row="4" Grid.Column="1" x:Name="issueDatePicker" Margin="0,4"
-                            AutomationProperties.Name="签发日期选择框"/>
+                            AutomationProperties.Name="签发日期"/>
 
                 <!-- Row 5: 有效期至 -->
                 <Label Grid.Row="5" Grid.Column="0" Content="有效期至(_E):" Target="{Binding ElementName=expiryDatePicker}"
                        AutomationProperties.Name="有效期至"/>
                 <DatePicker Grid.Row="5" Grid.Column="1" x:Name="expiryDatePicker" Margin="0,4"
-                            AutomationProperties.Name="有效期至选择框"/>
+                            AutomationProperties.Name="有效期至"/>
 
                 <!-- Row 6: 签发机关 -->
                 <Label Grid.Row="6" Grid.Column="0" Content="签发机关(_A):" Target="{Binding ElementName=issueAuthorityBox}"
                        AutomationProperties.Name="签发机关"/>
                 <TextBox Grid.Row="6" Grid.Column="1" x:Name="issueAuthorityBox" Margin="0,4"
-                         AutomationProperties.Name="签发机关输入框"/>
+                         AutomationProperties.Name="签发机关"/>
 
                 <!-- Row 7: 分类 -->
                 <Label Grid.Row="7" Grid.Column="0" Content="分类(_G):" Target="{Binding ElementName=categoryBox}"
                        AutomationProperties.Name="分类"/>
                 <ComboBox Grid.Row="7" Grid.Column="1" x:Name="categoryBox" IsEditable="True" Margin="0,4"
-                          AutomationProperties.Name="分类选择框，可编辑"/>
+                          AutomationProperties.Name="分类"/>
 
                 <!-- Row 8: 证件图片 -->
                 <Label Grid.Row="8" Grid.Column="0" Content="证件图片(_P):"
@@ -104,7 +104,7 @@
                 <TextBox Grid.Row="9" Grid.Column="1" x:Name="notesBox" Margin="0,4"
                          AcceptsReturn="True" TextWrapping="Wrap" Height="80"
                          VerticalScrollBarVisibility="Auto"
-                         AutomationProperties.Name="备注输入框，可多行"/>
+                         AutomationProperties.Name="备注"/>
             </Grid>
         </ScrollViewer>
 

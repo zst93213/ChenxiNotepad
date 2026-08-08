@@ -17,47 +17,47 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-            <Label Content="标题(_T):" Target="{Binding ElementName=titleBox}" AutomationProperties.Name="标题标签"/>
-            <TextBox x:Name="titleBox" Width="420" AutomationProperties.Name="笔记标题"/>
+            <Label Content="标题(_T):" Target="{Binding ElementName=titleBox}" AutomationProperties.Name="标题"/>
+            <TextBox x:Name="titleBox" Width="420" AutomationProperties.Name="标题"/>
         </StackPanel>
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
-            <Label Content="分类(_C):" Target="{Binding ElementName=categoryBox}" AutomationProperties.Name="分类标签"/>
-            <ComboBox x:Name="categoryBox" IsEditable="True" Width="200" AutomationProperties.Name="笔记分类，可选择或输入"/>
+            <Label Content="分类(_C):" Target="{Binding ElementName=categoryBox}" AutomationProperties.Name="分类"/>
+            <ComboBox x:Name="categoryBox" IsEditable="True" Width="200" AutomationProperties.Name="分类"/>
         </StackPanel>
         <!-- 内容标签 + 字数统计 + 排版工具栏（同一行） -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,4">
-            <Label Content="内容(_N):" AutomationProperties.Name="内容标签"/>
+            <Label Content="内容(_N):" AutomationProperties.Name="内容"/>
             <TextBlock x:Name="charCountText" Text="共 0 字" Margin="12,0,0,0"
                        VerticalAlignment="Center" Opacity="0.7"
                        AutomationProperties.Name="字数统计"/>
-            <Label Content="排版(_F):" Margin="24,0,4,0" Target="{Binding ElementName=formatPresetBox}" AutomationProperties.Name="排版预设标签"/>
+            <Label Content="排版(_F):" Margin="24,0,4,0" Target="{Binding ElementName=formatPresetBox}" AutomationProperties.Name="排版预设"/>
             <ComboBox x:Name="formatPresetBox" Width="160" SelectedIndex="0"
-                      AutomationProperties.Name="排版预设，选择排版方式"/>
+                      AutomationProperties.Name="排版预设"/>
             <Button x:Name="formatButton" Content="排版(_R)" Padding="8,4" Margin="4,0,0,0"
                     Click="OnFormatClick"
-                    AutomationProperties.Name="开始排版按钮，应用选中的排版预设"/>
+                    AutomationProperties.Name="开始排版"/>
         </StackPanel>
         <TextBox Grid.Row="3" x:Name="contentBox" Margin="0,0,0,8"
                  AcceptsReturn="True" TextWrapping="Wrap"
                  VerticalScrollBarVisibility="Auto"
                  TextChanged="OnContentTextChanged"
-                 AutomationProperties.Name="笔记内容输入框"/>
+                 AutomationProperties.Name="内容"/>
         <!-- 工具栏：查找替换、朗读、语音输入 -->
         <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,0,0,4">
             <Button x:Name="findReplaceButton" Content="查找替换(_H)" Padding="10,4" Margin="0,0,6,0"
                     Click="OnFindReplace"
-                    AutomationProperties.Name="查找替换按钮，快捷键Ctrl+H"/>
+                    AutomationProperties.Name="查找替换"/>
             <Button x:Name="speakButton" Content="朗读(_S)" Padding="10,4" Margin="0,0,6,0"
                     Click="OnSpeak"
-                    AutomationProperties.Name="朗读按钮，朗读选中文本或全部内容"/>
+                    AutomationProperties.Name="朗读"/>
             <Button x:Name="stopSpeakButton" Content="停止(_T)" Padding="10,4" Margin="0,0,6,0"
                     Click="OnStopSpeak"
-                    AutomationProperties.Name="停止朗读按钮"/>
+                    AutomationProperties.Name="停止朗读"/>
             <Button x:Name="voiceInputButton" Content="语音输入(_V)" Padding="10,4" Margin="0,0,6,0"
                     Click="OnVoiceInput"
-                    AutomationProperties.Name="语音输入按钮，启动Windows听写"/>
+                    AutomationProperties.Name="语音输入"/>
             <TextBlock x:Name="statusText" Text="" VerticalAlignment="Center" Opacity="0.7"
-                       AutomationProperties.Name="状态提示"/>
+                       AutomationProperties.Name="状态"/>
         </StackPanel>
         <!-- 底部按钮 -->
         <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">

@@ -2358,28 +2358,25 @@ public partial class MainWindow : Window
     private void DoCopyUrl()
     {
         var entry = GetSelectedUrl();
-        if (entry is null) { Announce("请先选中一个网址。"); return; }
-        if (string.IsNullOrWhiteSpace(entry.Url)) { Announce("该条目没有网址。"); return; }
+        if (entry is null) return;
+        if (string.IsNullOrWhiteSpace(entry.Url)) return;
         _clipboard.CopyToClipboard(entry.Url);
-        Announce($"已复制 {entry.Title} 的网址到剪贴板。");
     }
 
     private void DoCopyName()
     {
         var entry = GetSelectedUrl();
-        if (entry is null) { Announce("请先选中一个网址。"); return; }
-        if (string.IsNullOrEmpty(entry.Title)) { Announce("该条目没有名称。"); return; }
+        if (entry is null) return;
+        if (string.IsNullOrEmpty(entry.Title)) return;
         _clipboard.CopyToClipboard(entry.Title);
-        Announce($"已复制名称：{entry.Title}。");
     }
 
     private void DoCopyAccount()
     {
         var entry = GetSelectedUrl();
-        if (entry is null) { Announce("请先选中一个网址。"); return; }
-        if (string.IsNullOrEmpty(entry.Account)) { Announce("该条目没有账号。"); return; }
+        if (entry is null) return;
+        if (string.IsNullOrEmpty(entry.Account)) return;
         _clipboard.CopyToClipboard(entry.Account);
-        Announce($"已复制账号：{entry.Account}。");
     }
 
     // ---- 密码复制操作 ----

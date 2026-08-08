@@ -5,7 +5,7 @@ namespace BlindNotepad.Services;
 
 /// <summary>
 /// 快捷键配置服务：加载、保存、导出/导入快捷键绑定配置。
-/// 配置文件存储于 %LocalAppData%/SuixinJi/shortcuts.json。
+/// 配置文件存储于程序目录下的 data/shortcuts.json（用户能直接找到）。
 /// </summary>
 public static class ShortcutConfigService
 {

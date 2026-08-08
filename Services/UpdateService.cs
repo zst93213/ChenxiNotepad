@@ -211,12 +211,12 @@ public static class UpdateService
 
     /// <summary>
     /// 生成并启动更新脚本（.bat），自动完成：
-    /// 1. 等待当前应用退出
-    /// 2. 清空应用目录中的旧版本文件（保留目录本身）
-    /// 3. 复制新版本文件到应用目录
-    /// 4. 删除临时文件
-    /// 5. 重新启动应用
-    /// 注意：用户数据存储在 %LocalAppData%/SuixinJi/，与应用目录完全隔离，更新不会丢失数据。
+    /// 1. 记录每一步到日志（%Temp%\suixinji_update_&lt;pid&gt;.log）
+    /// 2. 等待当前应用退出
+    /// 3. 清空应用目录中的旧版本文件，但保留 data/ 目录（用户数据）
+    /// 4. 用 robocopy 优先复制新文件，失败回退 xcopy
+    /// 5. 清理临时 zip / 解压目录
+    /// 6. 校验新 exe 存在后启动；失败时弹出错误消息并保留日志
     /// </summary>
     /// <param name="newFilesDir">解压后的新文件目录。</param>
     /// <param name="appDir">应用安装目录（当前 exe 所在目录）。</param>
@@ -227,35 +227,111 @@ public static class UpdateService
         var pid = Environment.ProcessId;
         var tempDir = Path.GetTempPath();
         var batPath = Path.Combine(tempDir, $"suixinji_update_{pid}.bat");
+        var logPath = Path.Combine(tempDir, $"suixinji_update_{pid}.log");
 
         var batContent = $@"@echo off
 chcp 65001 >nul
-echo Updating SuixinJi, please wait...
+setlocal enabledelayedexpansion
 
-REM 等待旧进程退出（tasklist 过滤器语法必须为 PID eq <pid>）
+set ""LOGFILE={logPath}""
+set ""APPDIR={appDir}""
+set ""NEWDIR={newFilesDir}""
+set ""EXEPATH={appExePath}""
+set ""ZIPPATH={tempZipPath}""
+set ""PID={pid}""
+set ""BATFILE={batPath}""
+
+call :LOG ===== SuixinJi Update Start =====
+call :LOG Time: %date% %time%
+call :LOG AppDir: %APPDIR%
+call :LOG NewFilesDir: %NEWDIR%
+call :LOG CurrentPID: %PID%
+
+REM 1. 等待旧进程退出（超时 120 秒）
+set WAITS=0
 :waitloop
-tasklist /FI ""PID eq {pid}"" /NH 2>nul | find ""{pid}"" >nul
+tasklist /FI ""PID eq %PID%"" /NH 2>nul | find ""%PID%"" >nul
 if %errorlevel%==0 (
     ping -n 2 127.0.0.1 >nul
+    set /A WAITS+=1
+    if !WAITS! GEQ 60 (
+        call :LOG WARN: timed out waiting for process exit, continuing anyway.
+        goto endwait
+    )
     goto waitloop
 )
+:endwait
+call :LOG Old process has exited.
 
-REM 清空应用目录中的旧版本文件（保留目录本身）
-del /q /f /s ""{appDir}\*"" 2>nul
-for /d %%i in (""{appDir}\*"") do rd /s /q ""%%i"" 2>nul
+REM 2. 清理旧版本文件（保留 data 目录；保留子目录结构，因为 data/ 存放用户数据）
+call :LOG Step 2: Cleaning old files in %APPDIR% while preserving data/
+for /f ""delims="" %%F in ('dir /b /a-d ""%APPDIR%\*"" 2^>nul') do (
+    del /q /f ""%APPDIR%\%%F"" >nul 2>&1
+)
+for /d %%D in (""%APPDIR%\*"") do (
+    if /i not ""%%~nxD""==""data"" (
+        rd /s /q ""%%D"" >nul 2>&1
+        call :LOG Removed directory: %%D
+    ) else (
+        call :LOG Preserved data directory: %%D
+    )
+)
 
-REM 复制新版本文件到应用目录
-xcopy ""{newFilesDir}\*"" ""{appDir}\"" /E /Y /I /Q
+REM 3. 复制新文件：优先 robocopy（更稳，退出码 0-7 都算成功）
+call :LOG Step 3: Copying new files from %NEWDIR%
+if exist ""%SYSTEMROOT%\System32\robocopy.exe"" (
+    call :LOG Using robocopy
+    ""%SYSTEMROOT%\System32\robocopy.exe"" ""%NEWDIR%"" ""%APPDIR%"" /E /IS /IT /R:3 /W:2 /NFL /NDL /NP
+    set RC=%ERRORLEVEL%
+    if !RC! GEQ 8 (
+        call :LOG ERROR: robocopy failed with exit code !RC!
+        goto reporterror
+    )
+    call :LOG robocopy done, exit code !RC!
+) else (
+    call :LOG robocopy not found, fallback to xcopy
+    xcopy ""%NEWDIR%\*"" ""%APPDIR%"" /E /Y /I /Q
+    set RC=%ERRORLEVEL%
+    if not ""!RC!""==""0"" (
+        call :LOG ERROR: xcopy failed with exit code !RC!
+        goto reporterror
+    )
+    call :LOG xcopy done.
+)
 
-REM 清理临时文件
-rd /s /q ""{newFilesDir}"" 2>nul
-del /q ""{tempZipPath}"" 2>nul
+REM 4. 清理临时文件
+call :LOG Step 4: Cleaning up temp files
+rd /s /q ""%NEWDIR%"" >nul 2>&1
+del /q ""%ZIPPATH%"" >nul 2>&1
 
-REM 启动新版本
-start """" ""{appExePath}""
+REM 5. 校验并启动新程序
+call :LOG Step 5: Verifying and launching %EXEPATH%
+if not exist ""%EXEPATH%"" (
+    call :LOG ERROR: %EXEPATH% not found after update.
+    goto reporterror
+)
 
-REM 删除自身
-del /q ""{batPath}"" 2>nul
+call :LOG Launching new app: %EXEPATH%
+start """" ""%EXEPATH%""
+set RC=%ERRORLEVEL%
+call :LOG start returned %RC%
+
+call :LOG ===== SuixinJi Update Success =====
+
+REM 6. 删除自身（延迟一帧，避免被占用）
+start /b "" cmd /c timeout /t 2 /nobreak >nul & del /q ""%BATFILE%""
+goto :eof
+
+:reporterror
+call :LOG ===== SuixinJi Update FAILED =====
+call :LOG Please check the log at: %LOGFILE%
+msg * ""更新失败：\n\n新程序复制后无法启动。\n请查看更新日志：\n%LOGFILE%""
+goto :eof
+
+:LOG
+echo %*
+echo %* >> ""%LOGFILE%""
+goto :eof
 ";
 
         // 使用 UTF-8 (无 BOM) 写入 bat，并配合 chcp 65001 切到 UTF-8 代码页，
@@ -268,8 +344,17 @@ del /q ""{batPath}"" 2>nul
             WindowStyle = ProcessWindowStyle.Normal,
             CreateNoWindow = false,
             UseShellExecute = true,
+            WorkingDirectory = tempDir,
         };
 
         Process.Start(startInfo);
+
+        // 写一条更新启动日志，方便排查 bat 没跑的问题
+        try
+        {
+            File.AppendAllText(logPath,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Updater launched. bat={batPath} appDir={appDir} newDir={newFilesDir}\n");
+        }
+        catch { }
     }
 }

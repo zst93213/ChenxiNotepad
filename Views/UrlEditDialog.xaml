@@ -27,34 +27,34 @@
         <Label Grid.Row="0" Grid.Column="0" Content="站点名称(_N):" Target="{Binding ElementName=titleBox}"
                AutomationProperties.Name="站点名称"/>
         <TextBox Grid.Row="0" Grid.Column="1" x:Name="titleBox" Margin="0,4"
-                 AutomationProperties.Name="站点名称输入框"/>
+                 AutomationProperties.Name="站点名称"/>
 
         <Label Grid.Row="1" Grid.Column="0" Content="网址(_U):" Target="{Binding ElementName=urlBox}"
                AutomationProperties.Name="网址"/>
         <TextBox Grid.Row="1" Grid.Column="1" x:Name="urlBox" Margin="0,4"
-                 AutomationProperties.Name="网址输入框"/>
+                 AutomationProperties.Name="网址"/>
 
         <Label Grid.Row="2" Grid.Column="0" Content="账号(_A):" Target="{Binding ElementName=accountBox}"
                AutomationProperties.Name="账号"/>
         <TextBox Grid.Row="2" Grid.Column="1" x:Name="accountBox" Margin="0,4"
-                 AutomationProperties.Name="账号输入框"/>
+                 AutomationProperties.Name="账号"/>
 
         <Label Grid.Row="3" Grid.Column="0" Content="分类(_C):" Target="{Binding ElementName=categoryBox}"
                AutomationProperties.Name="分类"/>
         <ComboBox Grid.Row="3" Grid.Column="1" x:Name="categoryBox" IsEditable="True" Margin="0,4"
-                  AutomationProperties.Name="分类选择框，可输入新分类"/>
+                  AutomationProperties.Name="分类"/>
 
         <Label Grid.Row="4" Grid.Column="0" Content="关联密码(_L):" Target="{Binding ElementName=linkedPasswordBox}"
                AutomationProperties.Name="关联密码"/>
         <ComboBox Grid.Row="4" Grid.Column="1" x:Name="linkedPasswordBox" Margin="0,4"
-                  AutomationProperties.Name="关联密码选择框，可选"/>
+                  AutomationProperties.Name="关联密码"/>
 
         <Label Grid.Row="5" Grid.Column="0" Content="备注(_R):" Target="{Binding ElementName=notesBox}"
                AutomationProperties.Name="备注"/>
         <TextBox Grid.Row="5" Grid.Column="1" x:Name="notesBox" Margin="0,4"
                  AcceptsReturn="True" TextWrapping="Wrap"
                  VerticalScrollBarVisibility="Auto"
-                 AutomationProperties.Name="备注输入框，可多行"/>
+                 AutomationProperties.Name="备注"/>
 
         <StackPanel Grid.Row="6" Grid.ColumnSpan="2" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,12,0,0">
