@@ -209,7 +209,7 @@
                              MouseDoubleClick="OnAccountingDoubleClick"
                              AutomationProperties.Name="记账列表"/>
                     <Border x:Name="unlockPanel" Visibility="Collapsed"
-                            BorderBrush="{DynamicResource PinkMedium}" BorderThickness="1.5" Background="#C0FFFFFF"
+                            BorderBrush="{DynamicResource PinkMediumBrush}" BorderThickness="1.5" Background="#C0FFFFFF"
                             CornerRadius="10" Padding="24"
                             AutomationProperties.Name="主密码解锁面板">
                         <StackPanel VerticalAlignment="Center" MaxWidth="420" HorizontalAlignment="Left">
