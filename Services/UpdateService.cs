@@ -440,7 +440,9 @@ call :LOG ===== SuixinJi Update SUCCESS =====
 call :LOG Update finished at %date% %time%
 
 REM ========== 7. 删除 Update.bat 自身（延迟删除） ==========
-start /b "" cmd /c ""timeout /t 3 /nobreak >nul ^& del /q ""%BATFILE%"""
+REM 注意：下面一行故意不用引号嵌套，改用 cd + 相对路径，避免引号与 C# 逐字字符串冲突
+cd /d ""%TEMP%""
+start /b "" cmd /c ping -n 4 127.0.0.1 >nul ^& del /f /q ""%BATFILE%""
 goto :eof
 
 :reporterror
