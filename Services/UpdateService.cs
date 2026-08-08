@@ -270,7 +270,7 @@ set /A MAXWAITS=30
 set WAITS=0
 :waitloop
 REM 使用 wmic 精确检查指定 PID 是否还存在（比 tasklist+find 更可靠，不会误匹配包含该数字的其他进程）
-wmic process where "ProcessId='%PID%'" get ProcessId 2>nul | find ""%PID%"" >nul
+wmic process where ""ProcessId='%PID%'"" get ProcessId 2>nul | find ""%PID%"" >nul
 if %errorlevel%==0 (
     timeout /t 1 /nobreak >nul
     set /A WAITS+=1
