@@ -321,110 +321,163 @@ public partial class MainWindow : Window
 
     private void SwitchToModule(Module module)
     {
-        _currentModule = module;
+        try
+        {
+            _currentModule = module;
 
-        urlListBox.Visibility = Visibility.Collapsed;
-        snippetListBox.Visibility = Visibility.Collapsed;
-        passwordListBox.Visibility = Visibility.Collapsed;
-        noteListBox.Visibility = Visibility.Collapsed;
-        idDocumentListBox.Visibility = Visibility.Collapsed;
-        accountingListBox.Visibility = Visibility.Collapsed;
-        unlockPanel.Visibility = Visibility.Collapsed;
-        masterPasswordConfirmBox.Visibility = Visibility.Collapsed;
+            urlListBox.Visibility = Visibility.Collapsed;
+            snippetListBox.Visibility = Visibility.Collapsed;
+            passwordListBox.Visibility = Visibility.Collapsed;
+            noteListBox.Visibility = Visibility.Collapsed;
+            idDocumentListBox.Visibility = Visibility.Collapsed;
+            accountingListBox.Visibility = Visibility.Collapsed;
+            unlockPanel.Visibility = Visibility.Collapsed;
+            masterPasswordConfirmBox.Visibility = Visibility.Collapsed;
 
-        if (module == Module.Url)
-        {
-            urlListBox.Visibility = Visibility.Visible;
-            addButton.Visibility = Visibility.Visible;
-            RefreshTree();
-            RefreshList();
-            UpdateDetail();
-            FocusList();
-            UpdateStatus();
-        }
-        else if (module == Module.Snippet)
-        {
-            snippetListBox.Visibility = Visibility.Visible;
-            addButton.Visibility = Visibility.Visible;
-            RefreshTree();
-            RefreshList();
-            UpdateDetail();
-            FocusList();
-            UpdateStatus();
-            CheckAndOfferDraftRestore("snippet");
-        }
-        else if (module == Module.Password)
-        {
-            RefreshTree();
-            if (_isUnlocked && _vault is not null)
+            if (module == Module.Url)
             {
-                passwordListBox.Visibility = Visibility.Visible;
+                urlListBox.Visibility = Visibility.Visible;
                 addButton.Visibility = Visibility.Visible;
+                RefreshTree();
                 RefreshList();
                 UpdateDetail();
                 FocusList();
                 UpdateStatus();
             }
-            else
+            else if (module == Module.Snippet)
             {
-                ShowUnlockPanel();
-            }
-        }
-        else if (module == Module.Note)
-        {
-            RefreshTree();
-            if (_isUnlocked && _vault is not null)
-            {
-                noteListBox.Visibility = Visibility.Visible;
+                snippetListBox.Visibility = Visibility.Visible;
                 addButton.Visibility = Visibility.Visible;
+                RefreshTree();
                 RefreshList();
                 UpdateDetail();
                 FocusList();
                 UpdateStatus();
-                CheckAndOfferDraftRestore("note");
+                CheckAndOfferDraftRestore("snippet");
             }
-            else
+            else if (module == Module.Password)
             {
-                ShowUnlockPanel();
+                RefreshTree();
+                if (_isUnlocked && _vault is not null)
+                {
+                    passwordListBox.Visibility = Visibility.Visible;
+                    addButton.Visibility = Visibility.Visible;
+                    RefreshList();
+                    UpdateDetail();
+                    FocusList();
+                    UpdateStatus();
+                }
+                else
+                {
+                    ShowUnlockPanel();
+                }
             }
-        }
-        else if (module == Module.IdDocument)
-        {
-            RefreshTree();
-            if (_isUnlocked && _vault is not null)
+            else if (module == Module.Note)
             {
-                idDocumentListBox.Visibility = Visibility.Visible;
-                addButton.Visibility = Visibility.Visible;
-                RefreshList();
-                UpdateDetail();
-                FocusList();
-                UpdateStatus();
+                RefreshTree();
+                if (_isUnlocked && _vault is not null)
+                {
+                    noteListBox.Visibility = Visibility.Visible;
+                    addButton.Visibility = Visibility.Visible;
+                    RefreshList();
+                    UpdateDetail();
+                    FocusList();
+                    UpdateStatus();
+                    CheckAndOfferDraftRestore("note");
+                }
+                else
+                {
+                    ShowUnlockPanel();
+                }
             }
-            else
+            else if (module == Module.IdDocument)
             {
-                ShowUnlockPanel();
+                RefreshTree();
+                if (_isUnlocked && _vault is not null)
+                {
+                    idDocumentListBox.Visibility = Visibility.Visible;
+                    addButton.Visibility = Visibility.Visible;
+                    RefreshList();
+                    UpdateDetail();
+                    FocusList();
+                    UpdateStatus();
+                }
+                else
+                {
+                    ShowUnlockPanel();
+                }
             }
-        }
-        else // Accounting
-        {
-            RefreshTree();
-            if (_isUnlocked && _vault is not null)
+            else // Accounting
             {
-                accountingListBox.Visibility = Visibility.Visible;
-                addButton.Visibility = Visibility.Visible;
-                RefreshList();
-                UpdateDetail();
-                FocusList();
-                UpdateStatus();
-                AnnounceMonthlySummary();
+                RefreshTree();
+                if (_isUnlocked && _vault is not null)
+                {
+                    accountingListBox.Visibility = Visibility.Visible;
+                    addButton.Visibility = Visibility.Visible;
+                    RefreshList();
+                    UpdateDetail();
+                    FocusList();
+                    UpdateStatus();
+                    AnnounceMonthlySummary();
+                }
+                else
+                {
+                    ShowUnlockPanel();
+                }
             }
-            else
-            {
-                ShowUnlockPanel();
-            }
-        }
 
-        ResetActivityTimer();
+            ResetActivityTimer();
+        }
+        catch (Exception ex)
+        {
+            HandleModuleSwitchException(ex);
+        }
+    }
+
+    // =========================================================================
+    // 主菜单显示/隐藏（按 ALT 弹出，再次按 ALT 或 ESC 隐藏）
+    // =========================================================================
+    private void ToggleMainMenu()
+    {
+        if (mainMenu is null) return;
+        if (mainMenu.Visibility == Visibility.Visible)
+            HideMainMenu();
+        else
+            ShowMainMenu();
+    }
+
+    private void ShowMainMenu()
+    {
+        if (mainMenu is null) return;
+        mainMenu.Visibility = Visibility.Visible;
+        Announce("菜单已显示，按 ALT 或 ESC 关闭。");
+    }
+
+    private void HideMainMenu()
+    {
+        if (mainMenu is null) return;
+        mainMenu.Visibility = Visibility.Collapsed;
+    }
+
+    // =========================================================================
+    // 兜底：模块切换/快捷键异常不再崩溃
+    // =========================================================================
+    private static void SafeSet(Action action)
+    {
+        if (action is null) return;
+        try { action(); }
+        catch (Exception ex) { HandleModuleSwitchException(ex); }
+    }
+
+    private static void HandleModuleSwitchException(Exception ex)
+    {
+        try
+        {
+            var log = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 模块切换/快捷键异常：\n{ex}\n\n";
+            var logPath = Path.Combine(StorageService.AppDataDir, "error.log");
+            File.AppendAllText(logPath, log);
+        }
+        catch { /* 写日志失败就放弃，不允许冒泡 */ }
     }
 
     private void ShowUnlockPanel()
@@ -1225,14 +1278,48 @@ public partial class MainWindow : Window
 
         var ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
         var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        var alt = Keyboard.Modifiers.HasFlag(ModifierKeys.Alt);
+        bool isAltKey = e.Key == Key.LeftAlt || e.Key == Key.RightAlt || e.SystemKey == Key.LeftAlt || e.SystemKey == Key.RightAlt;
 
-        // 模块切换 Ctrl+1~5
-        if (ctrl && !shift && e.Key == Key.D1) { e.Handled = true; urlModuleRadio.IsChecked = true; return; }
-        if (ctrl && !shift && e.Key == Key.D2) { e.Handled = true; snippetModuleRadio.IsChecked = true; return; }
-        if (ctrl && !shift && e.Key == Key.D3) { e.Handled = true; passwordModuleRadio.IsChecked = true; return; }
-        if (ctrl && !shift && e.Key == Key.D4) { e.Handled = true; noteModuleRadio.IsChecked = true; return; }
-        if (ctrl && !shift && e.Key == Key.D5) { e.Handled = true; idDocumentModuleRadio.IsChecked = true; return; }
-        if (ctrl && !shift && e.Key == Key.D6) { e.Handled = true; accountingModuleRadio.IsChecked = true; return; }
+        // ALT 键（单独按下）：切换主菜单栏可见性
+        if (!ctrl && !shift && (isAltKey || e.Key == Key.System))
+        {
+            // 真正只有 ALT 键（不组合）时触发菜单切换
+            if (isAltKey || (!alt && e.Key == Key.LeftAlt) || (!alt && e.Key == Key.RightAlt))
+            {
+                e.Handled = true;
+                ToggleMainMenu();
+                return;
+            }
+        }
+
+        // ESC：如果菜单开着先关掉菜单，其他场景交给后续逻辑
+        if (!ctrl && !shift && !alt && e.Key == Key.Escape)
+        {
+            if (mainMenu.Visibility == Visibility.Visible)
+            {
+                e.Handled = true;
+                HideMainMenu();
+                return;
+            }
+        }
+
+        try
+        {
+            // 模块切换 Ctrl+1~6
+            if (ctrl && !shift && e.Key == Key.D1) { e.Handled = true; SafeSet(() => urlModuleRadio.IsChecked = true); return; }
+            if (ctrl && !shift && e.Key == Key.D2) { e.Handled = true; SafeSet(() => snippetModuleRadio.IsChecked = true); return; }
+            if (ctrl && !shift && e.Key == Key.D3) { e.Handled = true; SafeSet(() => passwordModuleRadio.IsChecked = true); return; }
+            if (ctrl && !shift && e.Key == Key.D4) { e.Handled = true; SafeSet(() => noteModuleRadio.IsChecked = true); return; }
+            if (ctrl && !shift && e.Key == Key.D5) { e.Handled = true; SafeSet(() => idDocumentModuleRadio.IsChecked = true); return; }
+            if (ctrl && !shift && e.Key == Key.D6) { e.Handled = true; SafeSet(() => accountingModuleRadio.IsChecked = true); return; }
+        }
+        catch (Exception ex)
+        {
+            HandleModuleSwitchException(ex);
+            e.Handled = true;
+            return;
+        }
 
         // F6 切换焦点区域
         if (e.Key == Key.F6 && !ctrl && !shift) { e.Handled = true; CycleFocus(); return; }

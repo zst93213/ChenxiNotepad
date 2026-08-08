@@ -10,9 +10,11 @@
         Loaded="Window_Loaded"
         Closing="Window_Closing">
     <DockPanel>
-        <!-- 顶部菜单栏 -->
-        <Menu DockPanel.Dock="Top" AutomationProperties.Name="主菜单">
-            <MenuItem Header="文件(_F)" AutomationProperties.Name="文件菜单">
+        <!-- 顶部菜单栏：默认隐藏，按 ALT 才显示；再次按 ALT 或 ESC 隐藏 -->
+        <Menu x:Name="mainMenu" DockPanel.Dock="Top" Visibility="Collapsed"
+              KeyboardNavigation.IsTabStop="False" Focusable="False"
+              AutomationProperties.Name="主菜单">
+            <MenuItem Header="文件(_F)" AutomationProperties.Name="文件菜单" KeyboardNavigation.IsTabStop="False">
                 <MenuItem Header="新建(_N)" InputGestureText="Ctrl+N" Click="OnNew" AutomationProperties.Name="新建条目"/>
                 <MenuItem Header="保存(_S)" InputGestureText="Ctrl+S" Click="OnSave" AutomationProperties.Name="保存"/>
                 <Separator/>
@@ -28,7 +30,7 @@
                 <Separator/>
                 <MenuItem Header="退出(_X)" Click="OnExit" AutomationProperties.Name="退出程序"/>
             </MenuItem>
-            <MenuItem Header="编辑(_E)" AutomationProperties.Name="编辑菜单">
+            <MenuItem Header="编辑(_E)" AutomationProperties.Name="编辑菜单" KeyboardNavigation.IsTabStop="False">
                 <MenuItem Header="编辑(_E)" InputGestureText="Ctrl+E / F2" Click="OnEdit" AutomationProperties.Name="编辑条目"/>
                 <MenuItem Header="删除(_D)" InputGestureText="Ctrl+D / Del" Click="OnDelete" AutomationProperties.Name="删除条目"/>
                 <MenuItem Header="搜索(_R)" InputGestureText="Ctrl+F" Click="OnSearch" AutomationProperties.Name="搜索"/>
@@ -41,7 +43,7 @@
                 <MenuItem Header="切换排序(_O)" InputGestureText="Ctrl+Shift+O" Click="OnToggleSort" AutomationProperties.Name="切换排序模式"/>
                 <MenuItem Header="导出TXT(_X)" InputGestureText="Ctrl+Shift+X" Click="OnExportTxt" AutomationProperties.Name="导出为文本文件"/>
             </MenuItem>
-            <MenuItem Header="视图(_V)" AutomationProperties.Name="视图菜单">
+            <MenuItem Header="视图(_V)" AutomationProperties.Name="视图菜单" KeyboardNavigation.IsTabStop="False">
                 <MenuItem Header="网址收藏(_1)" InputGestureText="Ctrl+1" Click="OnSwitchUrl" AutomationProperties.Name="切换到网址收藏"/>
                 <MenuItem Header="记事本(_2)" InputGestureText="Ctrl+2" Click="OnSwitchSnippet" AutomationProperties.Name="切换到记事本"/>
                 <MenuItem Header="密码收藏(_3)" InputGestureText="Ctrl+3" Click="OnSwitchPassword" AutomationProperties.Name="切换到密码收藏"/>
@@ -51,7 +53,7 @@
                 <Separator/>
                 <MenuItem Header="切换焦点区域(_G)" InputGestureText="F6" Click="OnCycleFocus" AutomationProperties.Name="在分类树/列表/详情之间切换焦点"/>
             </MenuItem>
-            <MenuItem Header="操作(_O)" AutomationProperties.Name="操作菜单">
+            <MenuItem Header="操作(_O)" AutomationProperties.Name="操作菜单" KeyboardNavigation.IsTabStop="False">
                 <MenuItem Header="打开网址(_O)" InputGestureText="Enter" Click="OnOpenUrl" AutomationProperties.Name="用默认浏览器打开网址"/>
                 <MenuItem Header="复制网址(_C)" InputGestureText="Ctrl+Enter" Click="OnCopyUrl" AutomationProperties.Name="复制网址到剪贴板"/>
                 <Separator/>
@@ -68,14 +70,14 @@
                 <MenuItem Header="锁定密码库(_L)" InputGestureText="Ctrl+Shift+L" Click="OnLock" AutomationProperties.Name="锁定密码库"/>
                 <MenuItem Header="密码生成器(_G)" InputGestureText="F5" Click="OnPasswordGenerator" AutomationProperties.Name="打开密码生成器"/>
             </MenuItem>
-            <MenuItem Header="工具(_T)" AutomationProperties.Name="工具菜单">
+            <MenuItem Header="工具(_T)" AutomationProperties.Name="工具菜单" KeyboardNavigation.IsTabStop="False">
                 <MenuItem Header="重复检测(_D)" Click="OnDuplicateCheck" AutomationProperties.Name="检测重复网址和密码"/>
                 <MenuItem Header="网址健康检查(_H)" Click="OnUrlHealthCheck" AutomationProperties.Name="检查网址可访问性"/>
                 <MenuItem Header="分类管理(_C)" Click="OnCategoryManager" AutomationProperties.Name="管理分类和标签"/>
                 <MenuItem Header="查看审计日志(_A)" Click="OnViewAuditLog" AutomationProperties.Name="查看操作审计日志"/>
                 <MenuItem Header="快捷键设置(_K)" Click="OnShortcutConfig" AutomationProperties.Name="自定义快捷键"/>
             </MenuItem>
-            <MenuItem Header="帮助(_H)" AutomationProperties.Name="帮助菜单">
+            <MenuItem Header="帮助(_H)" AutomationProperties.Name="帮助菜单" KeyboardNavigation.IsTabStop="False">
                 <MenuItem Header="快捷键说明(_K)" Click="OnHelpShortcuts" AutomationProperties.Name="快捷键说明"/>
                 <MenuItem Header="检查更新(_U)" Click="OnCheckUpdate" AutomationProperties.Name="检查应用更新"/>
                 <MenuItem Header="更新日志(_L)" Click="OnViewChangelog" AutomationProperties.Name="查看更新日志"/>
@@ -83,36 +85,38 @@
             </MenuItem>
         </Menu>
 
-        <!-- 模块切换标签：网址收藏 / 记事本 / 密码收藏 / 日记 / 证件保存 -->
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Background="{DynamicResource TabBackgroundBrush}" Margin="0,0,0,3">
+        <!-- 模块切换标签：Ctrl+1~6 切换；不可用 TAB 到达（避免 TAB 冗余路径） -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Background="{DynamicResource TabBackgroundBrush}" Margin="0,0,0,3"
+                    KeyboardNavigation.IsTabStop="False" Focusable="False">
             <RadioButton x:Name="urlModuleRadio" Content="网址收藏" GroupName="Module"
                          IsChecked="True" Margin="10,5" Padding="6,2"
-                         Checked="OnUrlModuleChecked"
-                         AutomationProperties.Name="网址收藏模块，按 Ctrl+1 切换"/>
+                         Checked="OnUrlModuleChecked" Focusable="False" KeyboardNavigation.IsTabStop="False"
+                         AutomationProperties.Name="网址收藏模块"/>
             <RadioButton x:Name="snippetModuleRadio" Content="记事本" GroupName="Module"
                          Margin="10,5" Padding="6,2"
-                         Checked="OnSnippetModuleChecked"
-                         AutomationProperties.Name="记事本模块，按 Ctrl+2 切换"/>
+                         Checked="OnSnippetModuleChecked" Focusable="False" KeyboardNavigation.IsTabStop="False"
+                         AutomationProperties.Name="记事本模块"/>
             <RadioButton x:Name="passwordModuleRadio" Content="密码收藏" GroupName="Module"
                          Margin="10,5" Padding="6,2"
-                         Checked="OnPasswordModuleChecked"
-                         AutomationProperties.Name="密码收藏模块，按 Ctrl+3 切换"/>
+                         Checked="OnPasswordModuleChecked" Focusable="False" KeyboardNavigation.IsTabStop="False"
+                         AutomationProperties.Name="密码收藏模块"/>
             <RadioButton x:Name="noteModuleRadio" Content="日记" GroupName="Module"
                          Margin="10,5" Padding="6,2"
-                         Checked="OnNoteModuleChecked"
-                         AutomationProperties.Name="日记模块，按 Ctrl+4 切换"/>
+                         Checked="OnNoteModuleChecked" Focusable="False" KeyboardNavigation.IsTabStop="False"
+                         AutomationProperties.Name="日记模块"/>
             <RadioButton x:Name="idDocumentModuleRadio" Content="证件保存" GroupName="Module"
                          Margin="10,5" Padding="6,2"
-                         Checked="OnIdDocumentModuleChecked"
-                         AutomationProperties.Name="证件保存模块，按 Ctrl+5 切换"/>
+                         Checked="OnIdDocumentModuleChecked" Focusable="False" KeyboardNavigation.IsTabStop="False"
+                         AutomationProperties.Name="证件保存模块"/>
             <RadioButton x:Name="accountingModuleRadio" Content="记账" GroupName="Module"
                          Margin="10,5" Padding="6,2"
-                         Checked="OnAccountingModuleChecked"
-                         AutomationProperties.Name="记账模块，按 Ctrl+6 切换"/>
+                         Checked="OnAccountingModuleChecked" Focusable="False" KeyboardNavigation.IsTabStop="False"
+                         AutomationProperties.Name="记账模块"/>
         </StackPanel>
 
-        <!-- 底部状态栏 -->
+        <!-- 底部状态栏：TAB 不可达；只读提示用，不必获得焦点 -->
         <Grid DockPanel.Dock="Bottom" Height="30" Background="{DynamicResource StatusBarBackgroundBrush}"
+              Focusable="False" KeyboardNavigation.IsTabStop="False"
               AutomationProperties.Name="状态栏">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -120,15 +124,15 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" x:Name="statusPositionText"
-                       Text="就绪" VerticalAlignment="Center" Margin="8,0"
+                       Text="就绪" VerticalAlignment="Center" Margin="8,0" Focusable="False"
                        AutomationProperties.Name="当前位置"/>
             <TextBlock Grid.Column="1" x:Name="statusHintText"
                        Text="Ctrl+1 网址 Ctrl+2 记事本 Ctrl+3 密码 Ctrl+4 日记 Ctrl+5 证件 Ctrl+6 记账 F6 切换区域"
-                       VerticalAlignment="Center" Margin="12,0"
+                       VerticalAlignment="Center" Margin="12,0" Focusable="False"
                        AutomationProperties.Name="快捷键提示"/>
             <TextBlock Grid.Column="2" x:Name="statusMessageText"
                        Text="" HorizontalAlignment="Right" VerticalAlignment="Center"
-                       Margin="8,0"
+                       Margin="8,0" Focusable="False"
                        AutomationProperties.Name="操作结果播报"/>
         </Grid>
 
@@ -147,7 +151,7 @@
                       KeyDown="CategoryTree_KeyDown"/>
 
             <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch"
-                          ResizeBehavior="PreviousAndNext"
+                          ResizeBehavior="PreviousAndNext" Focusable="False" KeyboardNavigation.IsTabStop="False"
                           AutomationProperties.Name="分类树与列表的分隔条"/>
 
             <!-- 右侧：搜索框 + 列表 + 详情 -->
@@ -159,16 +163,17 @@
                     <RowDefinition Height="220"/>
                 </Grid.RowDefinitions>
 
-                <!-- 搜索框 -->
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,4">
-                    <Label Content="搜索(_S):" Target="{Binding ElementName=searchBox}"
-                           AutomationProperties.Name="搜索标签"/>
+                <!-- 搜索区：用 Ctrl+F 进入即可，TAB 不经过（避免循环焦点） -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,4"
+                            KeyboardNavigation.IsTabStop="False" Focusable="False">
+                    <Label Content="搜索(_S):" Target="{Binding ElementName=searchBox}" Focusable="False"
+                           AutomationProperties.Name="搜索"/>
                     <TextBox x:Name="searchBox" Width="320"
-                             TextChanged="OnSearchChanged"
-                             AutomationProperties.Name="搜索框，输入关键词过滤列表"/>
+                             TextChanged="OnSearchChanged" KeyboardNavigation.IsTabStop="False"
+                             AutomationProperties.Name="搜索框"/>
                     <Button x:Name="clearSearchButton" Content="清除(_C)" Margin="8,0,0,0"
-                            Click="OnClearSearch"
-                            AutomationProperties.Name="清除搜索内容"/>
+                            Click="OnClearSearch" KeyboardNavigation.IsTabStop="False"
+                            AutomationProperties.Name="清除搜索"/>
                 </StackPanel>
 
                 <!-- 列表区（网址/记事本/密码/日记/证件/记账/解锁面板）+ 底部添加按钮 -->
@@ -240,13 +245,13 @@
                 </Grid>
 
                 <GridSplitter Grid.Row="2" Height="6" HorizontalAlignment="Stretch"
-                              ResizeBehavior="PreviousAndNext"
+                              ResizeBehavior="PreviousAndNext" Focusable="False" KeyboardNavigation.IsTabStop="False"
                               AutomationProperties.Name="列表与详情的分隔条"/>
 
-                <!-- 详情区 -->
-                <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto"
+                <!-- 详情区：F6 可切进来；不在 TAB 链里（用 F6 专用导航切换） -->
+                <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Focusable="False" KeyboardNavigation.IsTabStop="False"
                               AutomationProperties.Name="详情区">
-                    <TextBlock x:Name="detailText" TextWrapping="Wrap" Focusable="True"
+                    <TextBlock x:Name="detailText" TextWrapping="Wrap" Focusable="False"
                                Padding="4"
                                AutomationProperties.Name="详情内容"/>
                 </ScrollViewer>
