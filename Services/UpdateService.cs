@@ -259,17 +259,19 @@ public static class UpdateService
         // bat 文件固定放在 appDir 下，避免临时目录被清理
         var batPath = Path.Combine(appDir, "Update.bat");
 
-        var batContent = $@"@echo off
+        // 使用占位符替换（不使用 C# 字符串插值 $），
+        // 彻底避免逐字字符串中双引号""和批处理语法冲突导致编译失败
+        var batContent = @"@echo off
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
-set ""LOGFILE={logPath}""
-set ""APPDIR={appDir}""
-set ""NEWDIR={newFilesDir}""
-set ""EXEPATH={appExePath}""
-set ""ZIPPATH={tempZipPath}""
-set ""PID={pid}""
-set ""BATFILE={batPath}""
+set ""LOGFILE=__LOGFILE__""
+set ""APPDIR=__APPDIR__""
+set ""NEWDIR=__NEWDIR__""
+set ""EXEPATH=__EXEPATH__""
+set ""ZIPPATH=__ZIPPATH__""
+set ""PID=__PID__""
+set ""BATFILE=__BATFILE__""
 
 call :LOG ===== SuixinJi Update Start =====
 call :LOG Time: %date% %time%
@@ -313,7 +315,7 @@ attrib -r ""%APPDIR%\*.*"" /S /D >nul 2>&1
 
 REM ========== 3. 清理旧版本文件（保留 data 目录） ==========
 call :LOG Step 3: Cleaning old files in %APPDIR% (preserve data/)
-REM 先删文件
+REM 先删文件（保留 Update.bat 自身正在运行）
 for /f ""delims="" %%F in ('dir /b /a-d ""%APPDIR%\*"" 2^>nul') do (
     if /i not ""%%F""==""Update.bat"" (
         del /q /f ""%APPDIR%\%%F"" >nul 2>&1
@@ -349,7 +351,6 @@ if exist ""%SYSTEMROOT%\System32\robocopy.exe"" (
 )
 if ""!COPYOK!""==""0"" (
     call :LOG Using xcopy fallback
-    xcopy ""%NEWDIR%\*"" ""%APPDIR%"" /E /Y /I /Q /EXCLUDE:%BATFILE%.exclude.tmp 2>nul
     REM 写一个临时排除文件（排除 Update.bat）
     echo Update.bat > ""%APPDIR%\_exclude.tmp"" 2>nul
     xcopy ""%NEWDIR%\*"" ""%APPDIR%"" /E /Y /I /Q /EXCLUDE:%APPDIR%\_exclude.tmp >nul 2>&1
@@ -382,9 +383,9 @@ if not exist ""%EXEPATH%"" (
 REM 获取 exe 文件大小（用 for 循环避免参数引用问题）
 for %%A in (""%EXEPATH%"") do call :LOG Exe exists, size=%%~zA bytes.
 
-REM 关键修复：start 正确语法是 start "窗口标题" [/D工作目录] 命令
-REM 窗口标题必须为空字符串 ""，否则如果命令路径带引号会被误当作标题
-call :LOG About to launch [method 1]: start /D ""%APPDIR%"" title="" cmd=""%EXEPATH%""
+REM 关键修复：start 正确语法是 start ""窗口标题"" [/D工作目录] 命令
+REM 窗口标题必须为空字符串 """"，否则如果命令路径带引号会被误当作标题
+call :LOG Launch method 1: start /D ""%APPDIR%"" (with empty title)
 cd /d ""%APPDIR%""
 start """" /D ""%APPDIR%"" ""%EXEPATH%""
 set RC=%ERRORLEVEL%
@@ -414,10 +415,9 @@ if ""!NEWLAUNCHED!""==""0"" (
     )
 )
 if ""!NEWLAUNCHED!""==""0"" (
-    call :LOG WARN: Method 2 also failed, trying method 3: call via separate cmd instance.
+    call :LOG WARN: Method 2 also failed, trying method 3.
     cd /d ""%APPDIR%""
-    REM 避免引号嵌套问题：把命令写入临时 vbs 然后执行，或者直接用 explorer 打开
-    REM 这里使用更稳妥的方案：用 for 变量保存路径，然后 start
+    REM 更稳妥的方案：用 for 变量保存路径，然后 start 相对路径 exe
     set ""APP=%EXEPATH%""
     for %%P in (""!APP!"") do (
         set ""APPDIRVAR=%%~dpP""
@@ -440,7 +440,7 @@ call :LOG ===== SuixinJi Update SUCCESS =====
 call :LOG Update finished at %date% %time%
 
 REM ========== 7. 删除 Update.bat 自身（延迟删除） ==========
-start /b "" cmd /c ""timeout /t 3 /nobreak >nul & del /q ""%BATFILE%"""
+start /b "" cmd /c ""timeout /t 3 /nobreak >nul ^& del /q ""%BATFILE%"""
 goto :eof
 
 :reporterror
@@ -462,6 +462,15 @@ echo [%time%] %*
 echo [%date% %time%] %* >> ""%LOGFILE%""
 goto :eof
 ";
+        // 占位符替换（不使用 C# 插值 $ 语法，避免编译期解析错误）
+        batContent = batContent
+            .Replace("__LOGFILE__", logPath)
+            .Replace("__APPDIR__", appDir)
+            .Replace("__NEWDIR__", newFilesDir)
+            .Replace("__EXEPATH__", appExePath)
+            .Replace("__ZIPPATH__", tempZipPath)
+            .Replace("__PID__", pid.ToString())
+            .Replace("__BATFILE__", batPath);
 
         // 使用 UTF-8 (无 BOM) 写入 bat，并配合 chcp 65001 切到 UTF-8 代码页，
         // 以正确支持路径中可能出现的中文（如 Windows 用户名为中文）。
