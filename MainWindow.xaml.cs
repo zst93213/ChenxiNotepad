@@ -450,10 +450,6 @@ public partial class MainWindow : Window
     {
         if (mainMenu is null) return;
         mainMenu.Visibility = Visibility.Visible;
-        // 显示时恢复焦点和Tab导航能力
-        mainMenu.Focusable = true;
-        mainMenu.SetValue(KeyboardNavigation.IsTabStopProperty, true);
-        mainMenu.SetValue(KeyboardNavigation.TabNavigationProperty, KeyboardNavigationMode.Cycle);
         // 聚焦第一个菜单项，使方向键和字母助记键可用
         if (mainMenu.Items.Count > 0 && mainMenu.Items[0] is MenuItem firstItem)
         {
@@ -465,10 +461,6 @@ public partial class MainWindow : Window
     {
         if (mainMenu is null) return;
         mainMenu.Visibility = Visibility.Collapsed;
-        // 隐藏时彻底禁用焦点和Tab导航，确保争渡读屏也扫描不到
-        mainMenu.Focusable = false;
-        mainMenu.SetValue(KeyboardNavigation.IsTabStopProperty, false);
-        mainMenu.SetValue(KeyboardNavigation.TabNavigationProperty, KeyboardNavigationMode.None);
         // 焦点回到当前模块的列表
         FocusList();
     }
@@ -1262,41 +1254,6 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 HideMainMenu();
                 return;
-            }
-        }
-
-        // Tab 导航拦截：菜单隐藏时，Tab 只在 categoryTree → ListBox → addButton 之间循环
-        // 确保无论争渡读屏还是 WPF 原生导航，都永远 Tab 不到菜单
-        if (!ctrl && !shift && e.Key == Key.Tab &&
-            (mainMenu == null || mainMenu.Visibility != Visibility.Visible))
-        {
-            var focused = Keyboard.FocusedElement as FrameworkElement;
-            if (focused != null)
-            {
-                // 判断当前焦点是否在列表中
-                if (!shift)
-                {
-                    // 正向 Tab
-                    if (focused == addButton)
-                    {
-                        // 从 addButton → categoryTree（循环回顶部）
-                        e.Handled = true;
-                        categoryTree.Focus();
-                        return;
-                    }
-                    // 其余情况（categoryTree → ListBox, ListBox → addButton）让 WPF 默认处理
-                }
-                else
-                {
-                    // 反向 Tab (Shift+Tab)
-                    if (focused == categoryTree)
-                    {
-                        // 从 categoryTree → addButton（循环回底部）
-                        e.Handled = true;
-                        addButton.Focus();
-                        return;
-                    }
-                }
             }
         }
 

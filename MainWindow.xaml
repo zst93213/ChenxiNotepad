@@ -11,10 +11,8 @@
         Closing="Window_Closing">
     <DockPanel>
         <!-- 顶部菜单栏：默认隐藏（Collapsed），按 ALT 显示；再按 ALT 或 ESC 隐藏。
-             Collapsed 时彻底禁用焦点和Tab导航，确保争渡读屏也扫描不到。 -->
+             Collapsed 时 TAB 不可达；Visible 时可用方向键/TAB 导航菜单项。 -->
         <Menu x:Name="mainMenu" DockPanel.Dock="Top" Visibility="Collapsed"
-              Focusable="False" KeyboardNavigation.IsTabStop="False"
-              KeyboardNavigation.TabNavigation="None"
               AutomationProperties.Name="主菜单">
             <MenuItem Header="文件(_F)" AutomationProperties.Name="文件菜单">
                 <MenuItem Header="新建(_N)" InputGestureText="Ctrl+N" Click="OnNew" AutomationProperties.Name="新建条目"/>
