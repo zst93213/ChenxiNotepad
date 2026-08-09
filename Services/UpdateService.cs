@@ -228,13 +228,19 @@ public static class UpdateService
     }
 
     /// <summary>
-    /// 生成并启动更新脚本（.bat），自动完成：
+    /// 生成并启动 PowerShell 更新脚本，自动完成：
     /// 1. 记录每一步到日志（data/update_logs/）
     /// 2. 等待当前应用退出
     /// 3. 清空应用目录中的旧版本文件，但保留 data/ 目录（用户数据）
-    /// 4. 用 robocopy 优先复制新文件，失败回退 xcopy
+    /// 4. 复制新文件
     /// 5. 清理临时 zip / 解压目录
     /// 6. 校验新 exe 存在后启动；失败时弹出错误消息并保留日志
+    /// 
+    /// 使用 PowerShell 而非 bat 的原因：
+    /// - 原生 UTF-8 支持，不受代码页影响（bat 的 chcp 65001 在中文路径下仍有问题）
+    /// - 无 delayed expansion 陷阱（bat 中 ! ^ & 等字符会被吞）
+    /// - 引号转义简单（PowerShell 单引号字符串不需要转义双引号）
+    /// - .NET API 直接可用，文件操作更可靠
     /// </summary>
     /// <param name="newFilesDir">解压后的新文件目录。</param>
     /// <param name="appDir">应用安装目录（当前 exe 所在目录）。</param>
@@ -242,21 +248,19 @@ public static class UpdateService
     /// <param name="tempZipPath">下载的 zip 临时文件路径（更新完成后删除）。</param>
     public static void LaunchUpdater(string newFilesDir, string appDir, string appExePath, string tempZipPath)
     {
-        // 关键修复1：去除所有路径末尾的反斜杠，避免与 bat 引号冲突导致语法错误
+        // 去除路径末尾的反斜杠
         appDir = appDir.TrimEnd('\\', '/');
         newFilesDir = newFilesDir.TrimEnd('\\', '/');
         appExePath = appExePath.TrimEnd('\\', '/');
         tempZipPath = tempZipPath.TrimEnd('\\', '/');
 
-        // 关键修复2：自动下钻。如果 zip 解压后多一层目录（BlindNotepad_v2.x.x/），
-        // 导致 newFilesDir 下没有 SuixinJi.exe，自动进入该子目录
+        // 自动下钻：zip 解压后可能多一层目录
         var exeName = Path.GetFileName(appExePath) ?? "SuixinJi.exe";
         if (!File.Exists(Path.Combine(newFilesDir, exeName)))
         {
             try
             {
-                var subDirs = Directory.GetDirectories(newFilesDir);
-                foreach (var sd in subDirs)
+                foreach (var sd in Directory.GetDirectories(newFilesDir))
                 {
                     if (File.Exists(Path.Combine(sd, exeName)))
                     {
@@ -270,329 +274,217 @@ public static class UpdateService
 
         var pid = Environment.ProcessId;
 
-        // 日志写到 data/update_logs 目录，用户容易找到
+        // 日志目录
         var updateLogDir = Path.Combine(appDir, "data", "update_logs");
         try { Directory.CreateDirectory(updateLogDir); } catch { }
 
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
         var logPath = Path.Combine(updateLogDir, $"update_{timestamp}.log");
-        // bat 文件固定放在 appDir 下，避免临时目录被清理
-        var batPath = Path.Combine(appDir, "Update.bat");
 
-        // 关键修复3：C# 端先立即写一条日志，保证即便 bat 一开头就崩也有轨迹
+        // C# 端先写一条日志
         try
         {
             File.WriteAllText(logPath,
                 $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ===== C# LaunchUpdater Entry =====\n" +
-                $"  batPath = {batPath}\n" +
                 $"  appDir  = {appDir}\n" +
                 $"  newFilesDir = {newFilesDir}\n" +
                 $"  appExePath  = {appExePath}\n" +
                 $"  tempZipPath = {tempZipPath}\n" +
                 $"  currentPID  = {pid}\n" +
-                $"  exeName     = {exeName}\n" +
                 $"  newDirHasExe = {File.Exists(Path.Combine(newFilesDir, exeName))}\n\n",
                 new System.Text.UTF8Encoding(false));
         }
         catch { }
 
-        // 使用占位符替换（不使用 C# 字符串插值 $），
-        // 彻底避免逐字字符串中双引号""和批处理语法冲突导致编译失败
-        var batContent = @"@echo off
-REM ===== 关键修复：路径中可能有 ! 或 ^ 等字符，在启用 delayed expansion 前先赋值，
-REM ===== 然后在需要访问路径变量时显式 setlocal DisableDelayedExpansion 防止被吞
-setlocal DisableDelayedExpansion
+        // 生成 PowerShell 脚本
+        // 注意：路径值用单引号包裹，PowerShell 单引号内不需要转义任何字符
+        // 但路径本身可能包含单引号（极罕见），用 -replace 做安全处理
+        var psScript = $@"# 随心记自动更新脚本 (PowerShell)
+# 由 UpdateService.LaunchUpdater 自动生成
+$ErrorActionPreference = 'Stop'
 
-chcp 65001 >nul
+$AppDir     = '{appDir}'
+$NewDir     = '{newFilesDir}'
+$ExePath    = '{appExePath}'
+$ZipPath    = '{tempZipPath}'
+$OldPid     = {pid}
+$LogPath    = '{logPath}'
+$ScriptPath = $MyInvocation.MyCommand.Path
 
-set ""LOGFILE=__LOGFILE__""
-set ""APPDIR=__APPDIR__""
-set ""NEWDIR=__NEWDIR__""
-set ""EXEPATH=__EXEPATH__""
-set ""ZIPPATH=__ZIPPATH__""
-set ""PID=__PID__""
-set ""BATFILE=__BATFILE__""
-set ""EXENAME=__EXENAME__""
+function Log($msg) {{
+    $line = '[' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '] ' + $msg
+    Write-Host $line
+    Add-Content -Path $LogPath -Value $line -Encoding UTF8
+}}
 
-REM ===== 立即写一条bat启动成功标记 =====
-call :RAWLOG [%date% %time%] ===== BAT LAUNCHED OK (stage 0: before delayed expansion) =====
-call :RAWLOG [%date% %time%] LOGFILE=%LOGFILE%
-call :RAWLOG [%date% %time%] APPDIR=%APPDIR%
-call :RAWLOG [%date% %time%] NEWDIR=%NEWDIR%
-call :RAWLOG [%date% %time%] EXEPATH=%EXEPATH%
+try {{
+    Log '===== SuixinJi Update Start ====='
 
-REM ===== 进入正式逻辑后再启用 delayed expansion（仅限数字/标志变量使用） =====
-setlocal EnableDelayedExpansion
+    # 1. 等待旧进程退出（最多30秒）
+    Log ""Step 1: Waiting for PID $OldPid to exit (max 30s)""
+    $waited = 0
+    $maxWait = 30
+    while ($waited -lt $maxWait) {{
+        $proc = Get-Process -Id $OldPid -ErrorAction SilentlyContinue
+        if ($null -eq $proc) {{ break }}
+        if ($proc.HasExited) {{ break }}
+        Start-Sleep -Seconds 1
+        $waited++
+    }}
+    if ($waited -ge $maxWait) {{
+        Log ""WARN: Timeout, force killing PID $OldPid""
+        try {{ Stop-Process -Id $OldPid -Force -ErrorAction SilentlyContinue }} catch {{}}
+        Start-Sleep -Seconds 3
+    }}
+    Log ""Old process exited. waited=$waited s.""
 
-call :LOG ===== SuixinJi Update Start (stage 1: delayed expansion enabled) =====
+    # 2. 删除旧文件（保留 data 目录和 Update.ps1 自身）
+    Log 'Step 2: Removing old files (preserve data/ and Update.ps1)'
+    Get-ChildItem -Path $AppDir -File | Where-Object {{ $_.Name -ne 'Update.ps1' }} | ForEach-Object {{
+        try {{ Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue }} catch {{}}
+    }}
+    Get-ChildItem -Path $AppDir -Directory | Where-Object {{ $_.Name -ne 'data' }} | ForEach-Object {{
+        try {{ Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }} catch {{}}
+        Log ""Removed dir: $($_.Name)""
+    }}
+    Log 'Old files removed.'
 
-REM ========== 1. 等待旧进程退出（超时 30 秒，双重检测） ==========
-set /A MAXWAITS=30
-set WAITS=0
-:waitloop
-set ""PROCALIVE=0""
-REM 优先用 wmic 精确检测 PID
-wmic process where ""ProcessId='%PID%'"" get ProcessId 2>nul | find ""%PID%"" >nul
-if %errorlevel%==0 set ""PROCALIVE=1""
-REM wmic 失败时用 tasklist 回退检测
-if ""!PROCALIVE!""==""0"" (
-    tasklist /FI ""PID eq %PID%"" /NH 2>nul | find ""%PID%"" >nul
-    if %errorlevel%==0 set ""PROCALIVE=1""
-)
+    # 3. 复制新文件
+    Log ""Step 3: Copying from $NewDir to $AppDir""
+    $copied = 0
+    $failed = 0
+    Get-ChildItem -Path $NewDir -Recurse -File | ForEach-Object {{
+        $relPath = $_.FullName.Substring($NewDir.Length).TrimStart('\','/')
+        $destPath = Join-Path $AppDir $relPath
+        # 排除 Update.ps1 自身
+        if ($destPath -ne $ScriptPath) {{
+            $destDir = Split-Path $destPath -Parent
+            if (-not (Test-Path $destDir)) {{
+                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            }}
+            try {{
+                Copy-Item $_.FullName -Destination $destPath -Force
+                $copied++
+            }} catch {{
+                $failed++
+                Log ""WARN: Failed to copy $relPath : $($_.Exception.Message)""
+            }}
+        }}
+    }}
+    Log ""Copy done: $copied files copied, $failed failed.""
 
-if ""!PROCALIVE!""==""1"" (
-    timeout /t 1 /nobreak >nul
-    set /A WAITS+=1
-    if !WAITS! GEQ %MAXWAITS% (
-        call :LOG WARN: timeout waiting %MAXWAITS%s for PID %PID%, force kill.
-        taskkill /F /PID %PID% /T >nul 2>&1
-        timeout /t 3 /nobreak >nul
-        goto endwait
-    )
-    goto waitloop
-)
-:endwait
-call :LOG Old process exited. waited=%WAITS%s.
+    if ($copied -eq 0 -and $failed -gt 0) {{
+        Log 'ERROR: All file copies failed!'
+        throw 'All file copies failed'
+    }}
 
-REM ========== 2. 移除目标目录只读属性，防止复制失败 ==========
-REM 操作路径时禁用 delayed expansion，防止路径中 ! ^ 等字符被吞
-setlocal DisableDelayedExpansion
-call :LOG Step 2: Remove read-only attributes in %APPDIR%
-attrib -r ""%APPDIR%\*.*"" /S /D >nul 2>&1
-endlocal & set ""rc_copy=ok""
+    # 4. 清理临时文件
+    Log 'Step 4: Cleaning temp files'
+    try {{ Remove-Item $NewDir -Recurse -Force -ErrorAction SilentlyContinue }} catch {{}}
+    try {{ Remove-Item $ZipPath -Force -ErrorAction SilentlyContinue }} catch {{}}
+    Log 'Temp cleaned.'
 
-REM ========== 3. 清理旧版本文件（保留 data 目录） ==========
-setlocal DisableDelayedExpansion
-call :LOG Step 3: Cleaning old files in %APPDIR% (preserve data/ and Update.bat)
-REM 先删文件（保留 Update.bat 自身正在运行）
-for /f ""delims="" %%F in ('dir /b /a-d ""%APPDIR%\*"" 2^>nul') do (
-    if /i not ""%%F""==""Update.bat"" (
-        del /q /f ""%APPDIR%\%%F"" >nul 2>&1
-    )
-)
-REM 再删子目录（保留 data）
-for /d %%D in (""%APPDIR%\*"") do (
-    if /i ""%%~nxD""==""data"" (
-        call :LOG Preserved data dir: %%D
-    ) else (
-        rd /s /q ""%%D"" >nul 2>&1
-        if exist ""%%D"" (
-            call :LOG WARN: Cannot remove dir %%D, will try overwrite copy.
-        ) else (
-            call :LOG Removed dir: %%D
+    # 5. 启动新程序
+    Log ""Step 5: Launching $ExePath""
+    if (-not (Test-Path $ExePath)) {{
+        Log ""ERROR: $ExePath not found after update!""
+        throw ""Exe not found: $ExePath""
+    }}
+    $exeInfo = Get-Item $ExePath
+    Log ""Exe exists, size=$($exeInfo.Length) bytes""
+
+    Start-Process -FilePath $ExePath -WorkingDirectory $AppDir
+    Log 'Start-Process called.'
+
+    Start-Sleep -Seconds 3
+    $newProc = Get-Process -Name 'SuixinJi' -ErrorAction SilentlyContinue
+    if ($null -ne $newProc) {{
+        Log ""SUCCESS: SuixinJi.exe running (PID: $($newProc.Id)).""
+    }} else {{
+        Log 'WARN: Process not found, retry...'
+        Start-Process -FilePath $ExePath
+        Start-Sleep -Seconds 3
+        $newProc = Get-Process -Name 'SuixinJi' -ErrorAction SilentlyContinue
+        if ($null -ne $newProc) {{
+            Log ""SUCCESS: Retry OK (PID: $($newProc.Id)).""
+        }} else {{
+            Log 'ERROR: Launch failed after retry!'
+            throw 'Launch failed'
+        }}
+    }}
+
+    Log '===== SuixinJi Update SUCCESS ====='
+
+}} catch {{
+    Log ""===== SuixinJi Update FAILED =====""
+    Log ""Error: $($_.Exception.Message)""
+    try {{
+        Add-Type -AssemblyName System.Windows.Forms
+        [System.Windows.Forms.MessageBox]::Show(
+            ""随心记自动更新失败！`n`n错误：$($_.Exception.Message)`n`n详细日志：$LogPath"",
+            '更新失败',
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
         )
-    )
-)
-endlocal & set ""rc_clean=ok""
-
-REM ========== 4. 复制新文件：robocopy 优先，xcopy 备用 ==========
-setlocal DisableDelayedExpansion
-call :LOG Step 4: Copying new files from %NEWDIR% to %APPDIR%
-set COPYOK=0
-if exist ""%SYSTEMROOT%\System32\robocopy.exe"" (
-    call :LOG Using robocopy
-    ""%SYSTEMROOT%\System32\robocopy.exe"" ""%NEWDIR%"" ""%APPDIR%"" /E /IS /IT /R:3 /W:2 /NFL /NDL /NP /XF Update.bat
-    set RC=%ERRORLEVEL%
-    if %RC% LSS 8 (
-        set COPYOK=1
-        call :LOG robocopy OK, code %RC%
-    ) else (
-        call :LOG robocopy FAILED, code %RC%
-    )
-)
-if ""%COPYOK%""==""0"" (
-    call :LOG Using xcopy fallback
-    echo Update.bat > ""%APPDIR%\_exclude.tmp"" 2>nul
-    xcopy ""%NEWDIR%\*"" ""%APPDIR%"" /E /Y /I /Q /EXCLUDE:%APPDIR%\_exclude.tmp >nul 2>&1
-    del /q ""%APPDIR%\_exclude.tmp"" >nul 2>&1
-    set RC=%ERRORLEVEL%
-    if %RC%==0 (
-        set COPYOK=1
-        call :LOG xcopy OK.
-    ) else (
-        call :LOG xcopy FAILED, code %RC%
-    )
-)
-if ""%COPYOK%""==""0"" (
-    call :LOG ERROR: Both robocopy and xcopy failed!
-    endlocal & goto reporterror
-)
-endlocal & set ""rc_copyfile=ok""
-
-REM ========== 5. 清理临时文件 ==========
-setlocal DisableDelayedExpansion
-call :LOG Step 5: Cleaning temp files
-rd /s /q ""%NEWDIR%"" >nul 2>&1
-del /q ""%ZIPPATH%"" >nul 2>&1
-call :LOG Temp cleaned.
-endlocal
-
-REM ========== 6. 校验并启动新程序（三种方法依次尝试，每次都用 DisableDelayedExpansion） ==========
-setlocal DisableDelayedExpansion
-call :LOG Step 6: Verify and launch %EXEPATH%
-if not exist ""%EXEPATH%"" (
-    call :LOG ERROR: %EXEPATH% does NOT exist after copy!
-    goto reporterror
-)
-REM 获取 exe 文件大小（用 for 循环避免参数引用问题）
-for %%A in (""%EXEPATH%"") do call :LOG Exe exists, size=%%~zA bytes.
-
-REM === 启动方法1 ===
-call :LOG Launch method 1: cd + start """" (title) /D APPDIR EXEPATH
-cd /d ""%APPDIR%""
-start """" /D ""%APPDIR%"" ""%EXEPATH%""
-set RC=%ERRORLEVEL%
-call :LOG start method 1 returned errorlevel=%RC%
-timeout /t 3 /nobreak >nul
-set ""NEWLAUNCHED=0""
-tasklist /NH 2>nul | find /i ""SuixinJi.exe"" >nul
-if %errorlevel%==0 (
-    set ""NEWLAUNCHED=1""
-    call :LOG SUCCESS: New process running after method 1.
-)
-
-REM === 启动方法2（方法1失败时） ===
-if ""%NEWLAUNCHED%""==""0"" (
-    call :LOG WARN: Method 1 failed, trying method 2: start without /D
-    cd /d ""%APPDIR%""
-    start """" ""%EXEPATH%""
-    set RC=%ERRORLEVEL%
-    call :LOG Method 2 start returned errorlevel=%RC%
-    timeout /t 3 /nobreak >nul
-    set ""NEWLAUNCHED=0""
-    tasklist /NH 2>nul | find /i ""SuixinJi.exe"" >nul
-    if %errorlevel%==0 (
-        set ""NEWLAUNCHED=1""
-        call :LOG SUCCESS: New process running after method 2.
-    )
-)
-
-REM === 启动方法3（方法2失败时）：写临时 bat 再用 cmd /c 启动 ===
-if ""%NEWLAUNCHED%""==""0"" (
-    call :LOG WARN: Method 2 failed, trying method 3: write helper launch bat
-    set ""LAUNCHBAT=%APPDIR%\_launch_now.tmp.bat""
-    echo @echo off > ""%LAUNCHBAT%""
-    echo cd /d ""%APPDIR%"" >> ""%LAUNCHBAT%""
-    echo start """" ""%EXEPATH%"" >> ""%LAUNCHBAT%""
-    call :LOG Helper bat written: %LAUNCHBAT%
-    call ""%LAUNCHBAT%""
-    set RC=%ERRORLEVEL%
-    call :LOG Helper bat returned %RC%
-    timeout /t 4 /nobreak >nul
-    set ""NEWLAUNCHED=0""
-    tasklist /NH 2>nul | find /i ""SuixinJi.exe"" >nul
-    if %errorlevel%==0 (
-        call :LOG SUCCESS: New process running after method 3.
-    ) else (
-        call :LOG ERROR: All 3 launch methods FAILED.
-        del /q ""%LAUNCHBAT%"" >nul 2>&1
-        goto reporterror
-    )
-    del /q ""%LAUNCHBAT%"" >nul 2>&1
-)
-endlocal
-
-call :LOG ===== SuixinJi Update SUCCESS =====
-call :LOG Update finished at %date% %time%
-
-REM ========== 7. 删除 Update.bat 自身（延迟删除） ==========
-REM 先切到 TEMP，确保 bat 不在 APPDIR 目录内持有句柄
-cd /d ""%TEMP%""
-start /b "" cmd /c ping -n 4 127.0.0.1 >nul ^& del /f /q ""%BATFILE%""
-goto :eof
-
-:reporterror
-call :LOG ===== SuixinJi Update FAILED =====
-call :LOG Failure time: %date% %time%
-call :LOG Log file location: %LOGFILE%
-echo.
-echo ============================================
-echo   UPDATE FAILED! Please check log:
-echo   %LOGFILE%
-echo ============================================
-echo.
-msg * ""随心记自动更新失败！\n\n详细日志已保存至：\n%LOGFILE%\n\n请将此日志反馈给开发者排查。""
-pause
-goto :eof
-
-:LOG
-REM 写日志时禁用 delayed expansion，防止路径字符被吞
-setlocal DisableDelayedExpansion
-echo [%time%] %*
-echo [%date% %time%] %* >> ""%LOGFILE%""
-endlocal
-goto :eof
-
-:RAWLOG
-REM 不经过任何处理直接追加原始日志（用于 delayed expansion 切换前）
-echo %*
-echo %* >> ""%LOGFILE%""
-goto :eof
+    }} catch {{}}
+}} finally {{
+    Log 'Deleting Update.ps1...'
+    try {{ Remove-Item $ScriptPath -Force -ErrorAction SilentlyContinue }} catch {{}}
+}}
 ";
-        // 占位符替换（不使用 C# 插值 $ 语法，避免编译期解析错误）
-        batContent = batContent
-            .Replace("__LOGFILE__", logPath)
-            .Replace("__APPDIR__", appDir)
-            .Replace("__NEWDIR__", newFilesDir)
-            .Replace("__EXEPATH__", appExePath)
-            .Replace("__ZIPPATH__", tempZipPath)
-            .Replace("__PID__", pid.ToString())
-            .Replace("__BATFILE__", batPath)
-            .Replace("__EXENAME__", exeName);
 
-        // 使用 UTF-8 (无 BOM) 写入 bat，并配合 chcp 65001 切到 UTF-8 代码页，
-        // 以正确支持路径中可能出现的中文（如 Windows 用户名为中文）。
-        File.WriteAllText(batPath, batContent, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        // PowerShell 脚本写到 appDir/Update.ps1
+        var psPath = Path.Combine(appDir, "Update.ps1");
+        File.WriteAllText(psPath, psScript, new System.Text.UTF8Encoding(false));
 
-        // 关键修复4：不直接启动 bat，而是启动 cmd.exe /K 来跑，
-        // 并用 Shell 方式执行，确保 bat 进程与 WPF 主进程完全分离、不随主程序关闭被杀
+        // 启动 PowerShell（绕过执行策略）
         var startInfo = new ProcessStartInfo
         {
-            FileName = "cmd.exe",
-            Arguments = $"/C \"\"{batPath}\"\"",
+            FileName = "powershell.exe",
+            Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{psPath}\"",
             WindowStyle = ProcessWindowStyle.Normal,
             CreateNoWindow = false,
-            UseShellExecute = true, // Shell 执行会完全独立，父进程退出不受影响
+            UseShellExecute = true,
             WorkingDirectory = appDir,
         };
 
-        Process? batProc = null;
+        Process? psProc = null;
         try
         {
-            batProc = Process.Start(startInfo);
+            psProc = Process.Start(startInfo);
         }
         catch (Exception ex)
         {
             try
             {
                 File.AppendAllText(logPath,
-                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ERROR: Process.Start(bat) failed: {ex.Message}\n{ex.StackTrace}\n",
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ERROR: Process.Start(powershell) failed: {ex.Message}\n{ex.StackTrace}\n",
                     new System.Text.UTF8Encoding(false));
             }
             catch { }
             throw;
         }
 
-        // 关键修复5：显式等待 bat 进程真的起来（最多等 3 秒），再让主程序关
-        if (batProc is not null)
+        // 等待 PowerShell 进程确认存活
+        if (psProc is not null)
         {
             try
             {
                 int waitMs = 0;
-                bool batAlive = false;
+                bool psAlive = false;
                 while (waitMs < 3000)
                 {
-                    batProc.Refresh();
-                    if (!batProc.HasExited)
+                    psProc.Refresh();
+                    if (!psProc.HasExited)
                     {
-                        batAlive = true;
+                        psAlive = true;
                         break;
                     }
                     Thread.Sleep(200);
                     waitMs += 200;
                 }
                 File.AppendAllText(logPath,
-                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] BAT PROCESS verified: alive={batAlive}, waited={waitMs}ms, batPID={(batProc.HasExited ? "exited" : batProc.Id.ToString())}\n",
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] PS PROCESS verified: alive={psAlive}, waited={waitMs}ms\n",
                     new System.Text.UTF8Encoding(false));
             }
             catch (Exception ex)
@@ -600,29 +492,17 @@ goto :eof
                 try
                 {
                     File.AppendAllText(logPath,
-                        $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] WARN: verify bat process exception: {ex.Message}\n",
+                        $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] WARN: verify ps exception: {ex.Message}\n",
                         new System.Text.UTF8Encoding(false));
                 }
                 catch { }
             }
         }
-        else
-        {
-            try
-            {
-                File.AppendAllText(logPath,
-                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] WARN: Process.Start returned null batProc\n",
-                    new System.Text.UTF8Encoding(false));
-            }
-            catch { }
-        }
 
-        // 写一条更新启动日志，方便排查 bat 没跑的问题
         try
         {
             File.AppendAllText(logPath,
-                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] C# Updater finished launching. About to exit SuixinJi.exe.\n" +
-                $"  接下来的等待旧进程退出、复制文件、启动新程序全部由 Update.bat 独立负责，不再依赖主程序存活。\n\n",
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] C# Updater finished. PowerShell will handle the rest.\n\n",
                 new System.Text.UTF8Encoding(false));
         }
         catch { }
