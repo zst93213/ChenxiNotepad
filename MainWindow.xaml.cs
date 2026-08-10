@@ -62,6 +62,9 @@ public partial class MainWindow : Window
     // 排序模式：0=按名称, 1=按创建时间, 2=按修改时间
     private int _sortMode;
 
+    // 详情区网址模块：true 表示临时忽略 HiddenFields 显示所有；false 按配置隐藏
+    private bool _showAllUrlFields;
+
     // 全局热键
     private const int WM_HOTKEY = 0x0312;
     private const int HOTKEY_ID_TOGGLE = 9001;
@@ -101,7 +104,20 @@ public partial class MainWindow : Window
         var helper = new WindowInteropHelper(this);
         _hwndSource = HwndSource.FromHwnd(helper.Handle);
         _hwndSource?.AddHook(WndProc);
-        RegisterHotKey(helper.Handle, HOTKEY_ID_TOGGLE, 0x0002 | 0x0004, 0x71); // Ctrl+Shift+F2
+        var hotKeyRegistered = RegisterHotKey(helper.Handle, HOTKEY_ID_TOGGLE, 0x0002 | 0x0004, 0x71); // Ctrl+Shift+F2
+        if (!hotKeyRegistered)
+        {
+            // 热键注册失败（很可能被其他程序占用了 Ctrl+Shift+F2）
+            // 再尝试 Ctrl+Alt+F2 作为后备方案，以便用户仍然可以使用
+            if (RegisterHotKey(helper.Handle, HOTKEY_ID_TOGGLE, 0x0002 | 0x0001, 0x71))
+            {
+                Announce("提示：Ctrl+Shift+F2 全局快捷键被占用，已自动改用 Ctrl+Alt+F2 切换窗口显示隐藏。");
+            }
+            else
+            {
+                Announce("提示：全局快捷键注册失败，请手动切换窗口显示隐藏。可能被其他程序占用。");
+            }
+        }
 
         // 日记连续记录提醒
         CheckDiaryStreak();
@@ -335,6 +351,9 @@ public partial class MainWindow : Window
         {
             _urlData.Categories.Add("默认");
         }
+        // 旧版单 Account 字段 -> Accounts 列表的兼容迁移
+        foreach (var entry in _urlData.Entries) entry.MigrateLegacyAccount();
+
         _snippetData = StorageService.LoadSnippets();
         if (_snippetData.Categories.Count == 0)
         {
@@ -803,7 +822,12 @@ public partial class MainWindow : Window
                             || u.Url.Contains(search, StringComparison.OrdinalIgnoreCase)
                             || u.Account.Contains(search, StringComparison.OrdinalIgnoreCase)
                             || u.Notes.Contains(search, StringComparison.OrdinalIgnoreCase)
-                            || u.Category.Contains(search, StringComparison.OrdinalIgnoreCase))
+                            || u.Category.Contains(search, StringComparison.OrdinalIgnoreCase)
+                            || u.Accounts.Any(a =>
+                                (a.Account ?? "").Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                                (a.Password ?? "").Contains(search, StringComparison.OrdinalIgnoreCase))
+                            || u.Secrets.Any(s =>
+                                (s.Secret ?? "").Contains(search, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
             _filteredUrls = SortEntries(_filteredUrls, u => u.IsFavorite, u => u.Title, u => u.CreatedTime, u => u.ModifiedTime);
 
@@ -984,7 +1008,11 @@ public partial class MainWindow : Window
         menu.Items.Add(MakeMenuItem("打开网址", "用默认浏览器打开网址", (_, _) => DoOpenUrl(), "Enter"));
         menu.Items.Add(MakeMenuItem("复制网址", "复制网址到剪贴板", (_, _) => DoCopyUrl(), "Ctrl+Enter"));
         menu.Items.Add(MakeMenuItem("复制名称", "复制站点名称到剪贴板", (_, _) => DoCopyName()));
-        menu.Items.Add(MakeMenuItem("复制账号", "复制账号到剪贴板", (_, _) => DoCopyAccount()));
+        menu.Items.Add(MakeMenuItem("复制账号", "复制账号到剪贴板（多个账号时会弹出选择）", (_, _) => DoCopyAccount()));
+        menu.Items.Add(MakeMenuItem("复制密码", "复制账号密码到剪贴板", (_, _) => DoCopyAccountPassword()));
+        menu.Items.Add(MakeMenuItem("复制密钥", "复制密钥到剪贴板", (_, _) => DoCopySecret()));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(MakeMenuItem("自定义显示", "打开字段显示/隐藏配置窗口", (_, _) => DoCustomizeUrlFields()));
         menu.Items.Add(new Separator());
         menu.Items.Add(MakeMenuItem("切换收藏", "切换收藏置顶", (_, _) => DoToggleFavorite(), "Ctrl+Shift+F"));
         menu.Items.Add(new Separator());
@@ -1026,6 +1054,17 @@ public partial class MainWindow : Window
     // =========================================================================
     // 选中项与详情
     // =========================================================================
+
+    /// <summary>把纯文本详情内容包装成可放入 ContentControl 的 TextBlock。</summary>
+    private static TextBlock MakeTextBlock(string text)
+    {
+        return new TextBlock
+        {
+            Text = text,
+            TextWrapping = TextWrapping.Wrap,
+            Focusable = false
+        };
+    }
 
     private UrlEntry? GetSelectedUrl() => (urlListBox.SelectedItem as ListBoxItem)?.Tag as UrlEntry;
     private SnippetEntry? GetSelectedSnippet() => (snippetListBox.SelectedItem as ListBoxItem)?.Tag as SnippetEntry;
@@ -1072,48 +1111,203 @@ public partial class MainWindow : Window
 
     private void UpdateDetail()
     {
-        detailText.Text = _currentModule switch
+        detailContent.Content = _currentModule switch
         {
-            Module.Url => GetSelectedUrl() is { } url ? BuildUrlDetail(url) : "（未选中网址条目）",
-            Module.Snippet => GetSelectedSnippet() is { } snip ? BuildSnippetDetail(snip) : "（未选中文案）",
-            Module.Password => GetSelectedPassword() is { } pwd ? BuildPasswordDetail(pwd) : "（未选中密码条目）",
-            Module.Note => GetSelectedNote() is { } note ? BuildNoteDetail(note) : "（未选中日记）",
-            Module.IdDocument => GetSelectedIdDocument() is { } doc ? BuildIdDocumentDetail(doc) : "（未选中证件）",
-            Module.Accounting => GetSelectedAccounting() is { } acc ? BuildAccountingDetail(acc) : "（未选中账目）",
-            _ => ""
+            Module.Url => GetSelectedUrl() is { } url ? BuildUrlDetailElement(url) : MakeTextBlock("（未选中网址条目）"),
+            Module.Snippet => GetSelectedSnippet() is { } snip ? MakeTextBlock(BuildSnippetDetail(snip)) : MakeTextBlock("（未选中文案）"),
+            Module.Password => GetSelectedPassword() is { } pwd ? MakeTextBlock(BuildPasswordDetail(pwd)) : MakeTextBlock("（未选中密码条目）"),
+            Module.Note => GetSelectedNote() is { } note ? MakeTextBlock(BuildNoteDetail(note)) : MakeTextBlock("（未选中日记）"),
+            Module.IdDocument => GetSelectedIdDocument() is { } doc ? MakeTextBlock(BuildIdDocumentDetail(doc)) : MakeTextBlock("（未选中证件）"),
+            Module.Accounting => GetSelectedAccounting() is { } acc ? MakeTextBlock(BuildAccountingDetail(acc)) : MakeTextBlock("（未选中账目）"),
+            _ => MakeTextBlock("")
         };
     }
 
     private void UpdateDetailForEmpty()
     {
         var needUnlock = (_currentModule == Module.Password || _currentModule == Module.Note || _currentModule == Module.IdDocument || _currentModule == Module.Accounting) && !_isUnlocked;
-        detailText.Text = needUnlock
+        detailContent.Content = MakeTextBlock(needUnlock
             ? "（密码库未解锁，请输入主密码）"
-            : "（当前没有条目，按 Ctrl+N 新建）\n\n提示：右键列表项可打开上下文菜单";
+            : "（当前没有条目，按 Ctrl+N 新建）\n\n提示：右键列表项可打开上下文菜单");
     }
 
-    private string BuildUrlDetail(UrlEntry entry)
+    // ------------------------------------------------------------------
+    // 网址详情：动态控件（支持隐藏字段 + 显示所有按钮）
+    // ------------------------------------------------------------------
+
+    private static string ChineseIndexLabel(int i) => i switch
     {
-        var linked = "无";
+        1 => "一", 2 => "二", 3 => "三", 4 => "四", 5 => "五",
+        6 => "六", 7 => "七", 8 => "八", 9 => "九", 10 => "十",
+        _ => i.ToString()
+    };
+
+    /// <summary>向 StackPanel 添加一行「标签: 值」的详情内容。</summary>
+    private void AddDetailRow(StackPanel panel, UrlEntry entry, string fieldKey, string label, string value)
+    {
+        // 若当前不处于「强制显示全部」模式且该字段被标记为隐藏 → 跳过
+        if (!_showAllUrlFields && entry.HiddenFields.Contains(fieldKey)) return;
+
+        var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var lbl = new TextBlock
+        {
+            Text = label + "：",
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, 0, 6, 0)
+        };
+        if (entry.HiddenFields.Contains(fieldKey))
+            lbl.Foreground = SystemColors.GrayTextBrush;
+        Grid.SetColumn(lbl, 0);
+        row.Children.Add(lbl);
+
+        var val = new TextBlock
+        {
+            Text = string.IsNullOrEmpty(value) ? "（空）" : value,
+            TextWrapping = TextWrapping.Wrap
+        };
+        if (entry.HiddenFields.Contains(fieldKey))
+            val.Foreground = SystemColors.GrayTextBrush;
+        Grid.SetColumn(val, 1);
+        row.Children.Add(val);
+
+        panel.Children.Add(row);
+    }
+
+    /// <summary>构造网址详情的 UIElement（StackPanel），包含隐藏字段过滤 + 「显示所有字段」切换按钮。</summary>
+    private UIElement BuildUrlDetailElement(UrlEntry entry)
+    {
+        var panel = new StackPanel();
+
+        // 站点名称永远显示（作为标题行）
+        var titleRow = new TextBlock
+        {
+            Text = "📌 " + entry.Title,
+            FontWeight = FontWeights.Bold,
+            FontSize = 16,
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+        panel.Children.Add(titleRow);
+
+        AddDetailRow(panel, entry, "url", "网址", entry.Url);
+
+        // 账号列表（若整个「accounts」被隐藏 → 整体跳过；否则逐字段判断）
+        bool hideAllAccounts = !_showAllUrlFields && entry.HiddenFields.Contains("accounts");
+        if (!hideAllAccounts)
+        {
+            for (int i = 0; i < entry.Accounts.Count; i++)
+            {
+                var acc = entry.Accounts[i];
+                var label = $"账号{ChineseIndexLabel(i + 1)}";
+                AddDetailRow(panel, entry, $"acc_{acc.Id}_account", $"{label}账号", acc.Account);
+                AddDetailRow(panel, entry, $"acc_{acc.Id}_password", $"{label}密码",
+                    string.IsNullOrEmpty(acc.Password) ? "" : "●●●●●●（右键复制密码）");
+            }
+        }
+        if (entry.Accounts.Count == 0)
+        {
+            if (!_showAllUrlFields && entry.HiddenFields.Contains("accounts")) { /* 隐藏 */ }
+            else panel.Children.Add(new TextBlock { Text = "账号密码：（无）", Foreground = SystemColors.GrayTextBrush, Margin = new Thickness(0,2,0,2) });
+        }
+
+        // 密钥列表
+        bool hideAllSecrets = !_showAllUrlFields && entry.HiddenFields.Contains("secrets");
+        if (!hideAllSecrets)
+        {
+            for (int i = 0; i < entry.Secrets.Count; i++)
+            {
+                var sec = entry.Secrets[i];
+                AddDetailRow(panel, entry, $"sec_{sec.Id}_secret", $"密钥{ChineseIndexLabel(i + 1)}", sec.Secret);
+            }
+        }
+        if (entry.Secrets.Count == 0)
+        {
+            if (!_showAllUrlFields && entry.HiddenFields.Contains("secrets")) { /* 隐藏 */ }
+            else panel.Children.Add(new TextBlock { Text = "密钥：（无）", Foreground = SystemColors.GrayTextBrush, Margin = new Thickness(0,2,0,2) });
+        }
+
+        AddDetailRow(panel, entry, "category", "分类", entry.Category);
+
+        // 关联密码
+        string linkedTitle = "无";
         if (!string.IsNullOrEmpty(entry.LinkedPasswordId) && _vault is not null)
         {
             var linkedEntry = _vault.Entries.FirstOrDefault(p => p.Id == entry.LinkedPasswordId);
-            if (linkedEntry is not null) linked = linkedEntry.Title;
+            if (linkedEntry is not null) linkedTitle = linkedEntry.Title;
+        }
+        AddDetailRow(panel, entry, "linkedPassword", "关联密码", linkedTitle);
+
+        // 收藏 / 健康状态（这两个字段不开放隐藏）
+        var meta = new TextBlock
+        {
+            Text = $"收藏：{(entry.IsFavorite ? "是" : "否")}    健康状态：{(entry.LastCheckedTime.HasValue ? $"{entry.LastCheckStatus}（{entry.LastCheckedTime:yyyy-MM-dd HH:mm}）" : "未检查")}",
+            Margin = new Thickness(0, 4, 0, 0),
+            Foreground = SystemColors.GrayTextBrush
+        };
+        panel.Children.Add(meta);
+
+        AddDetailRow(panel, entry, "notes", "备注", entry.Notes);
+
+        // 关联密码上面那行已经写了 收藏+健康  这里保留下面一行 操作提示
+        var hints = new TextBlock
+        {
+            Text = "\n提示：Enter 打开 | Ctrl+Enter 复制网址 | F2 编辑 | Del 删除 | Ctrl+Shift+F 收藏\n右键列表项 → 自定义显示：可隐藏不想看到的字段",
+            Margin = new Thickness(0, 6, 0, 0),
+            Foreground = SystemColors.GrayTextBrush
+        };
+        panel.Children.Add(hints);
+
+        // —————— 底部：显示所有字段 / 恢复隐藏 按钮 ——————
+        int hiddenCount = entry.HiddenFields.Count;
+        if (hiddenCount > 0)
+        {
+            var sep = new Border
+            {
+                Height = 1,
+                Background = SystemColors.ControlLightBrush,
+                Margin = new Thickness(0, 10, 0, 6)
+            };
+            panel.Children.Add(sep);
+
+            var btnRow = new StackPanel { Orientation = Orientation.Horizontal };
+            var status = new TextBlock
+            {
+                Text = _showAllUrlFields
+                    ? $"当前已临时显示所有 {hiddenCount} 个隐藏字段（灰色显示）。"
+                    : $"当前已隐藏 {hiddenCount} 个字段。",
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = SystemColors.GrayTextBrush,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+            btnRow.Children.Add(status);
+
+            var toggleBtn = new Button
+            {
+                Content = _showAllUrlFields ? "恢复隐藏字段" : "显示所有字段",
+                Padding = new Thickness(14, 4),
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+            AutomationProperties.SetName(toggleBtn, _showAllUrlFields ? "恢复隐藏字段按钮" : "显示所有字段按钮");
+            toggleBtn.Click += (_, _) =>
+            {
+                _showAllUrlFields = !_showAllUrlFields;
+                UpdateDetail();
+                Announce(_showAllUrlFields ? "已临时显示所有字段。" : "已恢复隐藏设置。");
+            };
+            btnRow.Children.Add(toggleBtn);
+
+            panel.Children.Add(btnRow);
+        }
+        else
+        {
+            // 没有隐藏字段就把状态重置，避免下次选中另一项时"显示所有"残留
+            _showAllUrlFields = false;
         }
 
-        var health = entry.LastCheckedTime.HasValue
-            ? $"{entry.LastCheckStatus}（{entry.LastCheckedTime:yyyy-MM-dd HH:mm}）"
-            : "未检查";
-
-        return $"站点名称：{entry.Title}\n"
-               + $"网址：{entry.Url}\n"
-               + $"账号：{entry.Account}\n"
-               + $"分类：{entry.Category}\n"
-               + $"收藏：{(entry.IsFavorite ? "是" : "否")}\n"
-               + $"健康状态：{health}\n"
-               + $"备注：{entry.Notes}\n"
-               + $"关联密码：{linked}\n\n"
-               + "提示：Enter 打开 | Ctrl+Enter 复制网址 | F2 编辑 | Del 删除 | Ctrl+Shift+F 收藏";
+        return panel;
     }
 
     private string BuildPasswordDetail(PasswordEntry entry)
@@ -1472,7 +1666,7 @@ public partial class MainWindow : Window
         }
         else if (IsListFocused())
         {
-            detailText.Focus();
+            detailContent.Focus();
             Announce("已切换到详情区。");
         }
         else
@@ -2507,12 +2701,151 @@ public partial class MainWindow : Window
         _clipboard.CopyToClipboard(entry.Title);
     }
 
+    private static string CnIndex(int i) => i switch
+    {
+        1 => "一", 2 => "二", 3 => "三", 4 => "四", 5 => "五",
+        6 => "六", 7 => "七", 8 => "八", 9 => "九", 10 => "十",
+        _ => i.ToString()
+    };
+
+    /// <summary>
+    /// 从多个候选中选一个复制。
+    /// 返回选中项 value（或 null 取消）。
+    /// </summary>
+    private string? PickFromMany(string title, string prompt, IReadOnlyList<(string Label, string Value)> candidates)
+    {
+        if (candidates.Count == 0) { Announce("当前没有可复制的内容。"); return null; }
+        if (candidates.Count == 1) return candidates[0].Value;
+
+        // 多个：弹出选择窗口（可用简单 Window + ListBox）
+        var win = new Window
+        {
+            Title = title,
+            Width = 420,
+            Height = 360,
+            MinWidth = 320,
+            MinHeight = 240,
+            Owner = this,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ShowInTaskbar = false
+        };
+        var panel = new StackPanel { Margin = new Thickness(12) };
+        var hint = new TextBlock { Text = prompt, Margin = new Thickness(0, 0, 0, 8), TextWrapping = TextWrapping.Wrap };
+        var list = new ListBox();
+        foreach (var c in candidates)
+        {
+            var display = c.Label;
+            if (!string.IsNullOrWhiteSpace(c.Value))
+            {
+                var preview = c.Value.Length > 30 ? c.Value.Substring(0, 30) + "..." : c.Value;
+                display += $"  →  {preview}";
+            }
+            list.Items.Add(new ListBoxItem { Content = display, Tag = c.Value });
+        }
+        list.SelectedIndex = 0;
+        list.Margin = new Thickness(0, 0, 0, 10);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        var okBtn = new Button { Content = "复制选中", Padding = new Thickness(16, 4), Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+        var cancelBtn = new Button { Content = "取消", Padding = new Thickness(16, 4), IsCancel = true };
+        buttons.Children.Add(okBtn); buttons.Children.Add(cancelBtn);
+        panel.Children.Add(hint);
+        panel.Children.Add(list);
+        panel.Children.Add(buttons);
+        win.Content = panel;
+        string? result = null;
+        okBtn.Click += (_, _) =>
+        {
+            if (list.SelectedItem is ListBoxItem it && it.Tag is string v) result = v;
+            win.DialogResult = true;
+            win.Close();
+        };
+        cancelBtn.Click += (_, _) => { win.DialogResult = false; win.Close(); };
+        win.ShowDialog();
+        return result;
+    }
+
     private void DoCopyAccount()
     {
         var entry = GetSelectedUrl();
         if (entry is null) return;
-        if (string.IsNullOrEmpty(entry.Account)) return;
-        _clipboard.CopyToClipboard(entry.Account);
+
+        var nonEmpty = entry.Accounts
+            .Where(a => !string.IsNullOrWhiteSpace(a.Account))
+            .Select((a, i) => (Label: $"账号{CnIndex(i + 1)}账号", Value: a.Account.Trim()))
+            .ToList();
+        // 兜底：如果 Accounts 没内容但 legacy Account 字段有值（理论上迁移后不会发生）
+        if (nonEmpty.Count == 0 && !string.IsNullOrWhiteSpace(entry.Account))
+            nonEmpty.Add(("账号", entry.Account.Trim()));
+
+        var chosen = PickFromMany("复制账号", "请选择要复制的账号：", nonEmpty);
+        if (chosen is not null)
+        {
+            _clipboard.CopyToClipboard(chosen);
+            Announce("账号已复制到剪贴板。");
+        }
+    }
+
+    private void DoCopyAccountPassword()
+    {
+        var entry = GetSelectedUrl();
+        if (entry is null) { Announce("请先选中一个网址。"); return; }
+
+        var nonEmpty = entry.Accounts
+            .Where(a => !string.IsNullOrWhiteSpace(a.Password))
+            .Select((a, i) => (Label: $"账号{CnIndex(i + 1)}密码（账号名：{(string.IsNullOrWhiteSpace(a.Account) ? "空" : a.Account)}）", Value: a.Password))
+            .ToList();
+
+        var chosen = PickFromMany("复制密码", "请选择要复制的账号密码：", nonEmpty);
+        if (chosen is not null)
+        {
+            var seconds = _vault?.Settings.ClipboardClearSeconds ?? 30;
+            if (seconds <= 0) seconds = 30;
+            _clipboard.CopyWithAutoClear(chosen, seconds, () => Announce("剪贴板已自动清除。"));
+            Announce($"已复制密码，{seconds} 秒后自动清除。");
+        }
+    }
+
+    private void DoCopySecret()
+    {
+        var entry = GetSelectedUrl();
+        if (entry is null) { Announce("请先选中一个网址。"); return; }
+
+        var nonEmpty = entry.Secrets
+            .Where(s => !string.IsNullOrWhiteSpace(s.Secret))
+            .Select((s, i) => (Label: $"密钥{CnIndex(i + 1)}", Value: s.Secret.Trim()))
+            .ToList();
+
+        var chosen = PickFromMany("复制密钥", "请选择要复制的密钥：", nonEmpty);
+        if (chosen is not null)
+        {
+            var seconds = _vault?.Settings.ClipboardClearSeconds ?? 30;
+            if (seconds <= 0) seconds = 30;
+            _clipboard.CopyWithAutoClear(chosen, seconds, () => Announce("剪贴板已自动清除。"));
+            Announce($"已复制密钥，{seconds} 秒后自动清除。");
+        }
+    }
+
+    /// <summary>
+    /// 上下文菜单「自定义显示」：打开字段隐藏配置窗口。
+    /// </summary>
+    private void DoCustomizeUrlFields()
+    {
+        var entry = GetSelectedUrl();
+        if (entry is null) { Announce("请先选中一个网址。"); return; }
+
+        var previous = CaptureFocus();
+        // 回调：每次点隐藏/显示/全部显示时 立刻保存 + 刷新详情
+        void OnChanged()
+        {
+            var idx = _urlData.Entries.IndexOf(entry);
+            if (idx >= 0) _urlData.Entries[idx] = entry; // 写回（ModifiedTime 已被对话框更新）
+            StorageService.SaveUrls(_urlData);
+            UpdateDetail();
+        }
+        var dlg = new UrlFieldCustomizeDialog(entry, OnChanged) { Owner = this };
+        dlg.ShowDialog();
+        // 关闭后再确保刷新一次列表（列表标题等不会变，详情前面已刷新）
+        RestoreFocus(previous);
     }
 
     // ---- 密码复制操作 ----

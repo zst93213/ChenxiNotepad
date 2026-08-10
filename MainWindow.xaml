@@ -250,9 +250,11 @@
                 <!-- 详情区：F6 可切进来；不在 TAB 链里（用 F6 专用导航切换） -->
                 <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Focusable="False" KeyboardNavigation.IsTabStop="False"
                               AutomationProperties.Name="详情区">
-                    <TextBlock x:Name="detailText" TextWrapping="Wrap" Focusable="False"
-                               Padding="4"
-                               AutomationProperties.Name="详情内容"/>
+                    <!-- 改为 ContentControl，可承载任意 UIElement：
+                         - 纯文本模块仍用 TextBlock 包装
+                         - 网址模块用 StackPanel + 交互按钮（显示所有字段等） -->
+                    <ContentControl x:Name="detailContent" Padding="4"
+                                    AutomationProperties.Name="详情内容"/>
                 </ScrollViewer>
             </Grid>
         </Grid>
