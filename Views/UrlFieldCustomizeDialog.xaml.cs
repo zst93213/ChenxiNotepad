@@ -78,7 +78,7 @@ public partial class UrlFieldCustomizeDialog : Window
         var btn = new Button
         {
             Content = isHidden ? "恢复显示" : "隐藏",
-            Padding = new Thickness(12, 3),
+            Padding = new Thickness(12, 3, 12, 3),
             Tag = fieldKey
         };
         AutomationProperties.SetName(btn, isHidden ? $"恢复显示{label}" : $"隐藏{label}");

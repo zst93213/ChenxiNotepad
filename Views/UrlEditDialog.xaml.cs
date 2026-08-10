@@ -162,7 +162,7 @@ public partial class UrlEditDialog : Window
             var delBtn = new Button
             {
                 Content = "删除",
-                Padding = new Thickness(10, 3),
+                Padding = new Thickness(10, 3, 10, 3),
                 Margin = new Thickness(8, 0, 0, 0),
                 IsEnabled = _accounts.Count > 1
             };
@@ -171,7 +171,7 @@ public partial class UrlEditDialog : Window
             {
                 _accounts.RemoveAt(index);
                 RebuildAccountsPanel();
-                _a11y.Announce($"已删除{label}。");
+                _a11y.Announce(this, $"已删除{label}。");
             };
             btnCol.Children.Add(delBtn);
             Grid.SetColumn(btnCol, 2);
@@ -185,7 +185,7 @@ public partial class UrlEditDialog : Window
     {
         _accounts.Add(new UrlAccount());
         RebuildAccountsPanel();
-        _a11y.Announce($"已添加账号{ChineseIndex(_accounts.Count)}。");
+        _a11y.Announce(this, $"已添加账号{ChineseIndex(_accounts.Count)}。");
         // 滚动到底部让新增控件可见
         rootScroll.ScrollToEnd();
     }
@@ -241,7 +241,7 @@ public partial class UrlEditDialog : Window
             var delBtn = new Button
             {
                 Content = "删除",
-                Padding = new Thickness(10, 3),
+                Padding = new Thickness(10, 3, 10, 3),
                 Margin = new Thickness(8, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -250,7 +250,7 @@ public partial class UrlEditDialog : Window
             {
                 _secrets.RemoveAt(index);
                 RebuildSecretsPanel();
-                _a11y.Announce($"已删除{label}。");
+                _a11y.Announce(this, $"已删除{label}。");
             };
             Grid.SetColumn(delBtn, 2);
             row.Children.Add(delBtn);
@@ -263,7 +263,7 @@ public partial class UrlEditDialog : Window
     {
         _secrets.Add(new UrlSecret());
         RebuildSecretsPanel();
-        _a11y.Announce($"已添加密钥{ChineseIndex(_secrets.Count)}。");
+        _a11y.Announce(this, $"已添加密钥{ChineseIndex(_secrets.Count)}。");
         rootScroll.ScrollToEnd();
     }
 

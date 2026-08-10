@@ -1287,7 +1287,7 @@ public partial class MainWindow : Window
             var toggleBtn = new Button
             {
                 Content = _showAllUrlFields ? "恢复隐藏字段" : "显示所有字段",
-                Padding = new Thickness(14, 4),
+                Padding = new Thickness(14, 4, 14, 4),
                 HorizontalAlignment = HorizontalAlignment.Left
             };
             AutomationProperties.SetName(toggleBtn, _showAllUrlFields ? "恢复隐藏字段按钮" : "显示所有字段按钮");
@@ -2745,8 +2745,8 @@ public partial class MainWindow : Window
         list.SelectedIndex = 0;
         list.Margin = new Thickness(0, 0, 0, 10);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var okBtn = new Button { Content = "复制选中", Padding = new Thickness(16, 4), Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
-        var cancelBtn = new Button { Content = "取消", Padding = new Thickness(16, 4), IsCancel = true };
+        var okBtn = new Button { Content = "复制选中", Padding = new Thickness(16, 4, 16, 4), Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+        var cancelBtn = new Button { Content = "取消", Padding = new Thickness(16, 4, 16, 4), IsCancel = true };
         buttons.Children.Add(okBtn); buttons.Children.Add(cancelBtn);
         panel.Children.Add(hint);
         panel.Children.Add(list);
