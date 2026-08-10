@@ -36,31 +36,79 @@ public partial class ShortcutConfigDialog : Window
 
     private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        // 选中项变化时只更新显示，不自动进入捕获模式
+        _capturing = false;
+        applyButton.Content = "修改快捷键(_A)";
         if (shortcutList.SelectedItem is ListBoxItem item && item.Tag is ShortcutBinding b)
         {
             gestureBox.Text = b.KeyGesture;
-            _a11y.Announce(gestureBox, $"选中：{b.DisplayName}，当前快捷键：{b.KeyGesture}。在此按下新的快捷键组合。");
+            _a11y.Announce(gestureBox, $"选中：{b.DisplayName}，当前快捷键：{b.KeyGesture}。点击修改快捷键按钮来设置新的快捷键。");
         }
-        _capturing = true;
-        gestureBox.Focus();
     }
 
+    /// <summary>用户点击"修改快捷键"按钮时进入捕获模式。</summary>
     private void OnApply(object sender, RoutedEventArgs e)
     {
-        if (shortcutList.SelectedItem is ListBoxItem item && item.Tag is ShortcutBinding b)
+        if (!_capturing)
         {
-            if (!string.IsNullOrEmpty(b.KeyGesture))
+            // 进入捕获模式
+            _capturing = true;
+            applyButton.Content = "正在捕获...（按ESC取消）";
+            gestureBox.Focus();
+            if (shortcutList.SelectedItem is ListBoxItem item && item.Tag is ShortcutBinding b)
             {
-                RefreshList();
-                _a11y.Announce(gestureBox, $"已设置{b.DisplayName}的快捷键为：{b.KeyGesture}。");
+                _a11y.Announce(gestureBox, $"正在捕获{b.DisplayName}的快捷键，请按下新的组合键。按ESC取消。");
+            }
+            else
+            {
+                _a11y.Announce(gestureBox, "请先在列表中选择一个操作。");
+                _capturing = false;
+                applyButton.Content = "修改快捷键(_A)";
+            }
+        }
+        else
+        {
+            // 确认应用
+            _capturing = false;
+            applyButton.Content = "修改快捷键(_A)";
+            if (shortcutList.SelectedItem is ListBoxItem item && item.Tag is ShortcutBinding b)
+            {
+                if (!string.IsNullOrEmpty(b.KeyGesture))
+                {
+                    RefreshList();
+                    _a11y.Announce(gestureBox, $"已设置{b.DisplayName}的快捷键为：{b.KeyGesture}。");
+                }
             }
         }
     }
 
+    /// <summary>输入框获得焦点时不自动进入捕获模式（与旧版不同）。</summary>
+    private void OnGestureBoxFocus(object sender, RoutedEventArgs e)
+    {
+        // 仅在已在捕获模式时保持，不因聚焦而自动进入
+    }
+
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // ESC：如果在捕获模式，退出捕获而非关闭窗口
+        if (e.Key == Key.Escape && _capturing)
+        {
+            _capturing = false;
+            applyButton.Content = "修改快捷键(_A)";
+            _a11y.Announce(gestureBox, "已取消捕获。");
+            e.Handled = true;
+            return;
+        }
+
         if (!_capturing) return;
-        if (e.Key == Key.Escape || e.Key == Key.Enter) return;
+        if (e.Key == Key.Enter)
+        {
+            // Enter 确认捕获
+            _capturing = false;
+            applyButton.Content = "修改快捷键(_A)";
+            e.Handled = true;
+            return;
+        }
 
         e.Handled = true;
         var key = e.Key;
@@ -89,7 +137,9 @@ public partial class ShortcutConfigDialog : Window
         {
             b.KeyGesture = gesture;
             gestureBox.Text = gesture;
-            _a11y.Announce(gestureBox, $"捕获到快捷键：{gesture}。点击应用确认。");
+            _capturing = false;
+            applyButton.Content = "修改快捷键(_A)";
+            _a11y.Announce(gestureBox, $"捕获到快捷键：{gesture}。已设置{b.DisplayName}的快捷键。");
         }
     }
 

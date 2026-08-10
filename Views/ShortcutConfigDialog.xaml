@@ -14,7 +14,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,8" Opacity="0.7"
-                   Text="选择一个操作，在输入框中按下新的快捷键组合，点击应用。支持导出/导入配置。"
+                   Text="选择一个操作，点击"修改快捷键"按钮，然后按下新的快捷键组合。按ESC取消捕获。"
                    AutomationProperties.Name="说明"/>
         <DockPanel Grid.Row="1" LastChildFill="True">
             <Grid DockPanel.Dock="Right" Width="240" Margin="8,0,0,0">
@@ -24,8 +24,10 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Label Grid.Row="0" Content="当前快捷键：" AutomationProperties.Name="当前快捷键标签"/>
-                <TextBox Grid.Row="1" x:Name="gestureBox" Margin="0,0,0,8" IsReadOnly="True" AutomationProperties.Name="快捷键显示框"/>
-                <Button Grid.Row="2" x:Name="applyButton" Content="应用新快捷键(_A)" Padding="12,4" Click="OnApply" AutomationProperties.Name="应用新快捷键"/>
+                <TextBox Grid.Row="1" x:Name="gestureBox" Margin="0,0,0,8" IsReadOnly="True"
+                         AutomationProperties.Name="快捷键显示框"
+                         GotFocus="OnGestureBoxFocus"/>
+                <Button Grid.Row="2" x:Name="applyButton" Content="修改快捷键(_A)" Padding="12,4" Click="OnApply" AutomationProperties.Name="修改快捷键"/>
             </Grid>
             <ListBox x:Name="shortcutList" SelectionChanged="OnSelectionChanged" AutomationProperties.Name="快捷键列表"/>
         </DockPanel>

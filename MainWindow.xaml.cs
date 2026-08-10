@@ -62,6 +62,19 @@ public partial class MainWindow : Window
     // 排序模式：0=按名称, 1=按创建时间, 2=按修改时间
     private int _sortMode;
 
+    // 全局热键
+    private const int WM_HOTKEY = 0x0312;
+    private const int HOTKEY_ID_TOGGLE = 9001;
+    private HwndSource? _hwndSource;
+
+    [DllImport("user32.dll")]
+    private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+    [DllImport("user32.dll")]
+    private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    // MOD_CONTROL=0x0002, MOD_SHIFT=0x0004, VK_F2=0x71
+
     // 草稿自动保存计时器
     private DispatcherTimer? _draftSaveTimer;
     private string? _draftKey;
@@ -84,6 +97,12 @@ public partial class MainWindow : Window
         SetupAutoLockTimer();
         SetupDraftSaveTimer();
 
+        // 注册全局热键 Ctrl+Shift+F2
+        var helper = new WindowInteropHelper(this);
+        _hwndSource = HwndSource.FromHwnd(helper.Handle);
+        _hwndSource?.AddHook(WndProc);
+        RegisterHotKey(helper.Handle, HOTKEY_ID_TOGGLE, 0x0002 | 0x0004, 0x71); // Ctrl+Shift+F2
+
         // 日记连续记录提醒
         CheckDiaryStreak();
 
@@ -92,17 +111,51 @@ public partial class MainWindow : Window
 
         var screenReader = _a11y.IsScreenReaderRunning();
         Announce(screenReader
-            ? "欢迎使用随心记，已检测到读屏软件。当前：网址收藏。"
-            : "欢迎使用随心记。当前：网址收藏。");
+            ? "欢迎使用随心记，已检测到读屏软件。当前：网址收藏。按Ctrl+Shift+F2可随时显示或隐藏窗口。"
+            : "欢迎使用随心记。当前：网址收藏。按Ctrl+Shift+F2可随时显示或隐藏窗口。");
     }
 
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
     {
+        // 注销全局热键
+        var helper = new WindowInteropHelper(this);
+        UnregisterHotKey(helper.Handle, HOTKEY_ID_TOGGLE);
+        _hwndSource?.RemoveHook(WndProc);
+
         _clipboard.StopAutoClearTimer();
         _clipboard.ClearClipboard();
         _autoLockTimer?.Stop();
         _draftSaveTimer?.Stop();
         DisableAntiScreenshot();
+    }
+
+    /// <summary>全局热键消息处理：Ctrl+Shift+F2 切换窗口显示/隐藏。</summary>
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_HOTKEY && wParam.ToInt32() == HOTKEY_ID_TOGGLE)
+        {
+            ToggleWindowVisibility();
+            handled = true;
+        }
+        return IntPtr.Zero;
+    }
+
+    /// <summary>切换窗口可见性：可见时隐藏，隐藏时显示。</summary>
+    private void ToggleWindowVisibility()
+    {
+        if (IsVisible && WindowState != WindowState.Minimized)
+        {
+            // 窗口当前可见 → 隐藏到托盘
+            Hide();
+        }
+        else
+        {
+            // 窗口隐藏或最小化 → 显示并激活
+            Show();
+            WindowState = WindowState.Normal;
+            Activate();
+            Focus();
+        }
     }
 
     // =========================================================================
@@ -2070,6 +2123,12 @@ public partial class MainWindow : Window
         {
             "md" => "Markdown 文件",
             "html" => "网页文件",
+            "rtf" => "RTF 富文本",
+            "docx" => "Word 文档",
+            "xml" => "XML 文件",
+            "csv" => "CSV 表格",
+            "tex" => "LaTeX 文件",
+            "json" => "JSON 文件",
             _ => "文本文件",
         };
 
@@ -2083,10 +2142,47 @@ public partial class MainWindow : Window
         try
         {
             var count = 0;
-            var sb = new System.Text.StringBuilder();
-
-            // 如果是单条目导出且有 WrapContent（如 HTML），使用包装
             var entryList = entries.ToList();
+
+            // 二进制格式（如 DOCX）
+            if (preset.IsBinary && preset.BinaryContent is not null)
+            {
+                if (entryList.Count == 1)
+                {
+                    var entry = entryList[0];
+                    var content = preset.Options != TextFormatService.FormatOptions.None
+                        ? TextFormatService.Format(entry.Content, preset.Options)
+                        : entry.Content;
+                    var bytes = preset.BinaryContent(entry.Title, content);
+                    System.IO.File.WriteAllBytes(dlg.FileName, bytes);
+                    count = 1;
+                }
+                else
+                {
+                    // 多条目合并为一个文档
+                    var combinedContent = new System.Text.StringBuilder();
+                    foreach (var entry in entryList)
+                    {
+                        combinedContent.AppendLine(new string('=', 50));
+                        combinedContent.AppendLine($"标题：{entry.Title}");
+                        combinedContent.AppendLine(entry.Extra);
+                        combinedContent.AppendLine(new string('-', 50));
+                        var content = preset.Options != TextFormatService.FormatOptions.None
+                            ? TextFormatService.Format(entry.Content, preset.Options)
+                            : entry.Content;
+                        combinedContent.AppendLine(content);
+                        combinedContent.AppendLine();
+                        count++;
+                    }
+                    var bytes = preset.BinaryContent(defaultName, combinedContent.ToString());
+                    System.IO.File.WriteAllBytes(dlg.FileName, bytes);
+                }
+                Announce($"已导出 {count} 条到 {System.IO.Path.GetFileName(dlg.FileName)}，格式：{preset.Name}。");
+                return;
+            }
+
+            // 文本格式
+            var sb = new System.Text.StringBuilder();
             if (entryList.Count == 1 && preset.WrapContent is not null)
             {
                 var entry = entryList[0];

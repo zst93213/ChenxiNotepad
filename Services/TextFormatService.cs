@@ -1,3 +1,5 @@
+using System.IO.Compression;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -520,6 +522,10 @@ public static class TextFormatService
         public string FileExtension { get; init; } = "txt";
         /// <summary>导出时是否在内容外包裹格式包装（如 HTML 标签）。</summary>
         public Func<string, string, string>? WrapContent { get; init; }
+        /// <summary>二进制格式导出（如 DOCX），返回 byte[]。设置后 WrapContent 被忽略。</summary>
+        public Func<string, string, byte[]>? BinaryContent { get; init; }
+        /// <summary>是否为二进制格式。</summary>
+        public bool IsBinary => BinaryContent is not null;
     }
 
     /// <summary>所有排版预设列表。</summary>
@@ -644,11 +650,263 @@ public static class TextFormatService
                       FormatOptions.TrimLineSpaces | FormatOptions.CollapseExtraSpaces,
             FileExtension = "txt",
         },
+        // ===== 富文本与文档格式 =====
+        new()
+        {
+            Name = "RTF 富文本",
+            Description = "导出为 RTF 格式，保留段落结构，可被 Word/WPS 打开",
+            Options = FormatOptions.CollapseBlankLines | FormatOptions.TrimLineSpaces,
+            FileExtension = "rtf",
+            WrapContent = (title, content) =>
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine(@"{\rtf1\ansi\deff0 {\fonttbl {\f0 Microsoft YaHei;}}");
+                sb.AppendLine(@"{\colortbl;\red0\green0\blue0;\red0\green0\blue255;}");
+                sb.AppendLine($@"\pard\fs28\b {EscapeRtf(title)}\b0\par");
+                sb.AppendLine(@"\par");
+                foreach (var line in content.Split('\n'))
+                {
+                    var trimmed = line.Trim();
+                    if (string.IsNullOrEmpty(trimmed))
+                    {
+                        sb.AppendLine(@"\par");
+                    }
+                    else
+                    {
+                        sb.AppendLine($@"\pard\fs24 {EscapeRtf(trimmed)}\par");
+                    }
+                }
+                sb.AppendLine("}");
+                return sb.ToString();
+            },
+        },
+        new()
+        {
+            Name = "Word 文档 (DOCX)",
+            Description = "导出为 Word DOCX 格式，可被 Microsoft Word/WPS 打开",
+            Options = FormatOptions.CollapseBlankLines | FormatOptions.TrimLineSpaces,
+            FileExtension = "docx",
+            BinaryContent = (title, content) => GenerateDocx(title, content),
+        },
+        new()
+        {
+            Name = "XML 文档",
+            Description = "导出为 XML 格式，结构化文本数据",
+            Options = FormatOptions.CollapseBlankLines | FormatOptions.TrimLineSpaces,
+            FileExtension = "xml",
+            WrapContent = (title, content) =>
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+                sb.AppendLine("<document>");
+                sb.AppendLine($"  <title>{System.Net.WebUtility.HtmlEncode(title)}</title>");
+                sb.AppendLine("  <body>");
+                foreach (var line in content.Split('\n'))
+                {
+                    var trimmed = line.Trim();
+                    if (!string.IsNullOrEmpty(trimmed))
+                        sb.AppendLine($"    <paragraph>{System.Net.WebUtility.HtmlEncode(trimmed)}</paragraph>");
+                }
+                sb.AppendLine("  </body>");
+                sb.AppendLine("</document>");
+                return sb.ToString();
+            },
+        },
+        new()
+        {
+            Name = "CSV 表格",
+            Description = "导出为 CSV 格式，每行一条记录，可被 Excel/WPS 打开",
+            Options = FormatOptions.None,
+            FileExtension = "csv",
+            WrapContent = (title, content) =>
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("标题,内容");
+                foreach (var line in content.Split('\n'))
+                {
+                    var trimmed = line.Trim();
+                    if (!string.IsNullOrEmpty(trimmed))
+                    {
+                        // CSV 转义：含逗号/引号/换行的字段用双引号包裹，内部引号双倍
+                        var escaped = trimmed.Replace("\"", "\"\"");
+                        sb.AppendLine($"\"{title}\",\"{escaped}\"");
+                    }
+                }
+                return sb.ToString();
+            },
+        },
+        new()
+        {
+            Name = "LaTeX 学术格式",
+            Description = "导出为 LaTeX 格式，适合学术论文排版",
+            Options = FormatOptions.CollapseBlankLines | FormatOptions.TrimLineSpaces,
+            FileExtension = "tex",
+            WrapContent = (title, content) =>
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("\\documentclass[12pt,a4paper]{article}");
+                sb.AppendLine("\\usepackage[UTF8]{ctex}");
+                sb.AppendLine("\\usepackage{geometry}");
+                sb.AppendLine("\\geometry{margin=2.5cm}");
+                sb.AppendLine("\\title{" + EscapeLatex(title) + "}");
+                sb.AppendLine("\\author{}");
+                sb.AppendLine("\\date{}");
+                sb.AppendLine("\\begin{document}");
+                sb.AppendLine("\\maketitle");
+                foreach (var line in content.Split('\n'))
+                {
+                    var trimmed = line.Trim();
+                    if (string.IsNullOrEmpty(trimmed))
+                        sb.AppendLine();
+                    else
+                        sb.AppendLine(EscapeLatex(trimmed) + "\\\\");
+                }
+                sb.AppendLine("\\end{document}");
+                return sb.ToString();
+            },
+        },
+        new()
+        {
+            Name = "JSON 数据",
+            Description = "导出为 JSON 格式，结构化键值对数据",
+            Options = FormatOptions.None,
+            FileExtension = "json",
+            WrapContent = (title, content) =>
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("{");
+                sb.AppendLine($"  \"title\": \"{EscapeJson(title)}\",");
+                sb.AppendLine("  \"paragraphs\": [");
+                var lines = content.Split('\n').Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    var comma = i < lines.Count - 1 ? "," : "";
+                    sb.AppendLine($"    \"{EscapeJson(lines[i].Trim())}\"{comma}");
+                }
+                sb.AppendLine("  ]");
+                sb.AppendLine("}");
+                return sb.ToString();
+            },
+        },
     };
 
     /// <summary>根据预设名称查找预设。</summary>
     public static FormatPreset? FindPreset(string name)
     {
         return Array.Find(Presets, p => p.Name == name);
+    }
+
+    // ================================================================
+    //  格式转换辅助方法
+    // ================================================================
+
+    /// <summary>RTF 转义：反斜杠、花括号需要转义，中文转 Unicode。</summary>
+    private static string EscapeRtf(string text)
+    {
+        var sb = new StringBuilder();
+        foreach (char c in text)
+        {
+            if (c == '\\') sb.Append("\\\\");
+            else if (c == '{') sb.Append("\\{");
+            else if (c == '}') sb.Append("\\}");
+            else if (c > 127) sb.Append($"\\u{(int)c}?"); // 非 ASCII 用 Unicode 转义
+            else sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>LaTeX 转义：特殊字符加反斜杠。</summary>
+    private static string EscapeLatex(string text)
+    {
+        return text
+            .Replace("\\", "\\textbackslash{}")
+            .Replace("&", "\\&")
+            .Replace("%", "\\%")
+            .Replace("$", "\\$")
+            .Replace("#", "\\#")
+            .Replace("_", "\\_")
+            .Replace("{", "\\{")
+            .Replace("}", "\\}")
+            .Replace("~", "\\textasciitilde{}")
+            .Replace("^", "\\textasciicircum{}");
+    }
+
+    /// <summary>JSON 字符串转义。</summary>
+    private static string EscapeJson(string text)
+    {
+        return text
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("\n", "\\n")
+            .Replace("\r", "\\r")
+            .Replace("\t", "\\t");
+    }
+
+    /// <summary>生成最小化 DOCX 文件（OOXML 格式，即 ZIP 包含特定 XML 文件）。</summary>
+    private static byte[] GenerateDocx(string title, string content)
+    {
+        using var ms = new MemoryStream();
+        using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, true))
+        {
+            // [Content_Types].xml
+            var ct = archive.CreateEntry("[Content_Types].xml");
+            using (var w = new StreamWriter(ct.Open(), Encoding.UTF8))
+                w.Write("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+                    "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" +
+                    "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>" +
+                    "<Default Extension=\"xml\" ContentType=\"application/xml\"/>" +
+                    "<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>" +
+                    "</Types>");
+
+            // _rels/.rels
+            var rels = archive.CreateEntry("_rels/.rels");
+            using (var w = new StreamWriter(rels.Open(), Encoding.UTF8))
+                w.Write("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+                    "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
+                    "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/>" +
+                    "</Relationships>");
+
+            // word/document.xml
+            var doc = archive.CreateEntry("word/document.xml");
+            using (var w = new StreamWriter(doc.Open(), Encoding.UTF8))
+            {
+                var sb = new StringBuilder();
+                sb.Append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
+                sb.Append("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">");
+                sb.Append("<w:body>");
+
+                // 标题
+                sb.Append("<w:p><w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr>");
+                sb.Append($"<w:r><w:rPr><w:b/><w:sz w:val=\"40\"/></w:rPr><w:t>{EscapeXml(title)}</w:t></w:r>");
+                sb.Append("</w:p>");
+
+                // 正文段落
+                foreach (var line in content.Split('\n'))
+                {
+                    var trimmed = line.Trim();
+                    sb.Append("<w:p>");
+                    if (!string.IsNullOrEmpty(trimmed))
+                    {
+                        sb.Append($"<w:r><w:rPr><w:sz w:val=\"24\"/></w:rPr><w:t xml:space=\"preserve\">{EscapeXml(trimmed)}</w:t></w:r>");
+                    }
+                    sb.Append("</w:p>");
+                }
+
+                sb.Append("</w:body></w:document>");
+                w.Write(sb.ToString());
+            }
+        }
+        return ms.ToArray();
+    }
+
+    /// <summary>XML 转义。</summary>
+    private static string EscapeXml(string text)
+    {
+        return text
+            .Replace("&", "&amp;")
+            .Replace("<", "&lt;")
+            .Replace(">", "&gt;")
+            .Replace("\"", "&quot;")
+            .Replace("'", "&apos;");
     }
 }
