@@ -84,8 +84,10 @@ public partial class UpdateProgressDialog : Window
 
             UpdateCompleted = true;
 
-            // 给读屏一点时间播报状态
-            await Task.Delay(1500);
+            // 给读屏和 cmd 脚本足够时间启动
+            // cmd 脚本需要先启动、进入等待循环，然后才能检测到本进程退出
+            statusText.Text = "更新已下载，正在准备安装...应用即将关闭并重启。";
+            await Task.Delay(3000);
 
             // 关闭对话框 → 主窗口随后关闭应用
             DialogResult = true;
