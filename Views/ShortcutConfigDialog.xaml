@@ -14,7 +14,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,8" Opacity="0.7"
-                   Text="选择一个操作，点击"修改快捷键"按钮，然后按下新的快捷键组合。按ESC取消捕获。"
+                   Text="选择一个操作，点击修改快捷键按钮，然后按下新的快捷键组合。按ESC取消捕获。"
                    AutomationProperties.Name="说明"/>
         <DockPanel Grid.Row="1" LastChildFill="True">
             <Grid DockPanel.Dock="Right" Width="240" Margin="8,0,0,0">
