@@ -3758,7 +3758,16 @@ public partial class MainWindow : Window
     // 自动更新检查
     // =========================================================================
 
-    /// <summary>检查应用更新。silent=true 时静默检查，仅在有更新时提示。</summary>
+    /// <summary>后台已下载好的更新信息（启动时静默下载完成后缓存，供"一键更新"使用）。</summary>
+    private UpdateService.ReleaseInfo? _preDownloadedRelease;
+    /// <summary>后台已下载好的安装包路径。</summary>
+    private string? _preDownloadedZipPath;
+
+    /// <summary>
+    /// 检查应用更新。
+    /// silent=true：启动时静默检查，有更新时自动后台下载，下载完成后弹出"一键更新"提示。
+    /// silent=false：用户手动触发，直接走完整流程（检测→下载→安装→重启），全程进度对话框。
+    /// </summary>
     private async Task CheckForUpdateAsync(bool silent)
     {
         try
@@ -3813,53 +3822,178 @@ public partial class MainWindow : Window
                 return;
             }
 
-            // 有新版本且找到安装包：提示用户是否自动更新
-            var body = string.IsNullOrEmpty(release.Body) ? "无详细信息" : release.Body;
-            if (body.Length > 800) body = body[..800] + "...";
+            // ===== 有新版本且找到安装包 =====
 
-            var sizeStr = asset.Size > 0
-                ? $"（安装包大小：{asset.Size / (1024.0 * 1024):F1} MB）"
-                : "";
-
-            var msg = $"发现新版本 {release.TagName}！{sizeStr}\n\n" +
-                      $"当前版本：v{currentVer}\n" +
-                      $"发布日期：{release.PublishedAt:yyyy-MM-dd}\n\n" +
-                      $"更新内容：\n{body}\n\n" +
-                      $"是否立即下载并自动更新？\n" +
-                      $"更新过程中应用将自动关闭并重启。";
-
-            var result = MessageBox.Show(this, msg, "发现新版本",
-                MessageBoxButton.YesNo, MessageBoxImage.Information);
-
-            if (result != MessageBoxResult.Yes)
+            if (silent)
             {
-                Announce("已跳过本次更新。");
-                return;
+                // 启动时静默模式：后台下载，下载完成后弹提示
+                Announce($"发现新版本 {release.TagName}，正在后台下载更新，下载完成后将提醒您安装。");
+                await DownloadAndPromptInstallAsync(release, asset);
             }
-
-            // 启动自动更新对话框
-            Announce("正在下载更新，请稍候。");
-            var dialog = new UpdateProgressDialog(release, asset) { Owner = this };
-            dialog.Loaded += async (_, _) => await dialog.StartUpdateAsync();
-            dialog.ShowDialog();
-
-            if (dialog.UpdateCompleted)
+            else
             {
-                // 更新脚本已启动，关闭应用让脚本完成替换和重启
-                Announce("更新下载完成，应用即将重启。");
-                Application.Current.Shutdown();
-            }
-            else if (!string.IsNullOrEmpty(dialog.ErrorMessage))
-            {
-                Announce($"更新失败：{dialog.ErrorMessage}");
-                MessageBox.Show(this, $"更新失败：{dialog.ErrorMessage}\n\n" +
-                    "您可以稍后重试，或前往官网手动下载。",
-                    "更新失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                // 手动触发：直接走完整流程
+                StartFullUpdate(release, asset);
             }
         }
         catch
         {
             if (!silent) Announce("检查更新失败，请稍后重试。");
+        }
+    }
+
+    /// <summary>
+    /// 启动时静默模式：后台下载安装包，完成后弹出"一键更新"提示。
+    /// </summary>
+    private async Task DownloadAndPromptInstallAsync(
+        UpdateService.ReleaseInfo release, UpdateService.ReleaseAsset asset)
+    {
+        try
+        {
+            var tempZip = Path.Combine(Path.GetTempPath(),
+                $"suixinji_update_{release.TagName}.zip");
+
+            // 如果已经下载过（比如上次启动下了一半），先清理
+            try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch { }
+
+            // 静默下载，不显示进度对话框
+            await UpdateService.DownloadFileAsync(
+                asset.DownloadUrl, tempZip, null, CancellationToken.None);
+
+            // 校验大小
+            if (asset.Size > 0)
+            {
+                var actualSize = new FileInfo(tempZip).Length;
+                if (actualSize != asset.Size)
+                {
+                    Announce("更新下载不完整，将稍后重试。");
+                    return;
+                }
+            }
+
+            // 下载完成，缓存信息
+            _preDownloadedRelease = release;
+            _preDownloadedZipPath = tempZip;
+
+            // 弹出"一键更新"提示
+            var body = string.IsNullOrEmpty(release.Body) ? "无详细信息" : release.Body;
+            if (body.Length > 500) body = body[..500] + "...";
+
+            var sizeStr = asset.Size > 0
+                ? $"（安装包大小：{asset.Size / (1024.0 * 1024):F1} MB）"
+                : "";
+
+            var msg = $"更新已下载完成！\n\n" +
+                      $"新版本：{release.TagName} {sizeStr}\n" +
+                      $"当前版本：v{UpdateService.CurrentVersion}\n\n" +
+                      $"更新内容：\n{body}\n\n" +
+                      $"是否立即安装并重启？\n" +
+                      $"点击「是」后应用将自动关闭、安装并重启。";
+
+            Announce("更新已下载完成，是否立即安装？");
+
+            var result = MessageBox.Show(this, msg, "更新已就绪",
+                MessageBoxButton.YesNo, MessageBoxImage.Information);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                InstallPreDownloadedUpdate();
+            }
+            else
+            {
+                Announce("更新已暂存，您可稍后通过菜单「检查更新」安装。");
+            }
+        }
+        catch
+        {
+            // 静默模式下载失败不打扰用户
+        }
+    }
+
+    /// <summary>
+    /// 安装已后台下载好的更新（解压→安装→重启）。
+    /// </summary>
+    private void InstallPreDownloadedUpdate()
+    {
+        if (_preDownloadedRelease is null || string.IsNullOrEmpty(_preDownloadedZipPath))
+        {
+            Announce("更新文件丢失，请重新检查更新。");
+            return;
+        }
+
+        var asset = UpdateService.FindWinX64Asset(_preDownloadedRelease);
+        if (asset is null) return;
+
+        // 用进度对话框走完剩余流程（解压+安装+重启），跳过下载阶段
+        Announce("正在安装更新，应用即将关闭并重启。");
+        var dialog = new UpdateProgressDialog(_preDownloadedRelease, asset) { Owner = this };
+        dialog.Loaded += async (_, _) =>
+        {
+            // 直接跳到解压阶段
+            await dialog.StartInstallFromLocalAsync(_preDownloadedZipPath!);
+        };
+        dialog.ShowDialog();
+
+        if (dialog.UpdateCompleted)
+        {
+            Announce("更新安装完成，应用即将重启。");
+            Application.Current.Shutdown();
+        }
+        else if (!string.IsNullOrEmpty(dialog.ErrorMessage))
+        {
+            Announce($"更新失败：{dialog.ErrorMessage}");
+            MessageBox.Show(this, $"更新失败：{dialog.ErrorMessage}\n\n" +
+                "您可以稍后重试，或前往官网手动下载。",
+                "更新失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    /// <summary>
+    /// 手动触发：完整流程（检测→下载→安装→重启），全程进度对话框。
+    /// </summary>
+    private void StartFullUpdate(
+        UpdateService.ReleaseInfo release, UpdateService.ReleaseAsset asset)
+    {
+        var body = string.IsNullOrEmpty(release.Body) ? "无详细信息" : release.Body;
+        if (body.Length > 800) body = body[..800] + "...";
+
+        var sizeStr = asset.Size > 0
+            ? $"（安装包大小：{asset.Size / (1024.0 * 1024):F1} MB）"
+            : "";
+
+        var msg = $"发现新版本 {release.TagName}！{sizeStr}\n\n" +
+                  $"当前版本：v{UpdateService.CurrentVersion}\n" +
+                  $"发布日期：{release.PublishedAt:yyyy-MM-dd}\n\n" +
+                  $"更新内容：\n{body}\n\n" +
+                  $"是否立即下载并自动更新？\n" +
+                  $"更新过程中应用将自动关闭并重启。";
+
+        var result = MessageBox.Show(this, msg, "发现新版本",
+            MessageBoxButton.YesNo, MessageBoxImage.Information);
+
+        if (result != MessageBoxResult.Yes)
+        {
+            Announce("已跳过本次更新。");
+            return;
+        }
+
+        // 启动自动更新对话框（完整流程：下载→校验→解压→安装→重启）
+        Announce("正在下载更新，请稍候。");
+        var dialog = new UpdateProgressDialog(release, asset) { Owner = this };
+        dialog.Loaded += async (_, _) => await dialog.StartUpdateAsync();
+        dialog.ShowDialog();
+
+        if (dialog.UpdateCompleted)
+        {
+            Announce("更新下载完成，应用即将重启。");
+            Application.Current.Shutdown();
+        }
+        else if (!string.IsNullOrEmpty(dialog.ErrorMessage))
+        {
+            Announce($"更新失败：{dialog.ErrorMessage}");
+            MessageBox.Show(this, $"更新失败：{dialog.ErrorMessage}\n\n" +
+                "您可以稍后重试，或前往官网手动下载。",
+                "更新失败", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
