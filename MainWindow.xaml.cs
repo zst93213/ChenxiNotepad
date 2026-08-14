@@ -1012,6 +1012,7 @@ public partial class MainWindow : Window
         menu.Items.Add(MakeMenuItem("复制密码", "复制账号密码到剪贴板", (_, _) => DoCopyAccountPassword()));
         menu.Items.Add(MakeMenuItem("复制密钥", "复制密钥到剪贴板", (_, _) => DoCopySecret()));
         menu.Items.Add(new Separator());
+        menu.Items.Add(MakeMenuItem("克隆", "复制此网址条目（含账号/密钥等全部信息）", (_, _) => DoCloneUrl(), "Ctrl+Shift+D"));
         menu.Items.Add(MakeMenuItem("自定义显示", "打开字段显示/隐藏配置窗口", (_, _) => DoCustomizeUrlFields()));
         menu.Items.Add(new Separator());
         menu.Items.Add(MakeMenuItem("切换收藏", "切换收藏置顶", (_, _) => DoToggleFavorite(), "Ctrl+Shift+F"));
@@ -2003,6 +2004,57 @@ public partial class MainWindow : Window
             Announce($"已删除网址：{entry.Title}。");
         }
         else Announce("已取消删除。");
+    }
+
+    /// <summary>克隆当前网址条目：深拷贝全部信息，生成新 Id，名称加"(副本)"。</summary>
+    private void DoCloneUrl()
+    {
+        var entry = GetSelectedUrl();
+        if (entry is null) { Announce("请先选中要克隆的网址。"); return; }
+
+        var clone = new UrlEntry
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = entry.Title + "(副本)",
+            Url = entry.Url,
+            Category = entry.Category,
+            Notes = entry.Notes,
+            LinkedPasswordId = entry.LinkedPasswordId,
+            IsFavorite = false, // 克隆不继承收藏状态
+            LastCheckedTime = null,
+            LastCheckStatus = "Unknown",
+            CreatedTime = DateTime.Now,
+            ModifiedTime = DateTime.Now,
+            Account = entry.Account, // 保留旧字段
+            HiddenFields = new HashSet<string>(entry.HiddenFields),
+        };
+
+        // 深拷贝账号列表（每个账号生成新 Id）
+        foreach (var acc in entry.Accounts)
+        {
+            clone.Accounts.Add(new UrlAccount
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Account = acc.Account,
+                Password = acc.Password,
+            });
+        }
+
+        // 深拷贝密钥列表（每个密钥生成新 Id）
+        foreach (var sec in entry.Secrets)
+        {
+            clone.Secrets.Add(new UrlSecret
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Secret = sec.Secret,
+            });
+        }
+
+        _urlData.Entries.Add(clone);
+        EnsureCategoryExists(clone.Category);
+        StorageService.SaveUrls(_urlData);
+        RefreshTree(); RefreshList(); SelectUrlById(clone.Id);
+        Announce($"已克隆网址：{clone.Title}。");
     }
 
     private void EnsureCategoryExists(string? category)
