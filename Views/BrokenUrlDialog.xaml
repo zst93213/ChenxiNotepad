@@ -1,0 +1,51 @@
+<Window x:Class="BlindNotepad.BrokenUrlDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="失效网址确认"
+        Height="560" Width="640"
+        MinHeight="420" MinWidth="520"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        ResizeMode="CanResize"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        Loaded="Window_Loaded">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8" TextWrapping="Wrap"
+                   x:Name="hintText" AutomationProperties.Name="说明文字"/>
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button Content="全选(_S)" Padding="12,4" Margin="0,0,8,0" Click="OnSelectAll" AutomationProperties.Name="全选"/>
+            <Button Content="取消全选(_U)" Padding="12,4" Margin="0,0,8,0" Click="OnUnselectAll" AutomationProperties.Name="取消全选"/>
+            <CheckBox x:Name="selectAllCheck" Content="将失效网址全部选中准备删除" Margin="12,4"
+                      Checked="SelectAllCheck_Changed" Unchecked="SelectAllCheck_Changed"
+                      AutomationProperties.Name="将失效网址全部选中"/>
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="删除已选中(_D)" Padding="20,4" Margin="0,0,8,0"
+                    Click="OnDelete" IsDefault="True" AutomationProperties.Name="删除已选中"/>
+            <Button Content="全部保留(_K)" Padding="20,4" IsCancel="True" AutomationProperties.Name="全部保留"/>
+        </StackPanel>
+        <ListView x:Name="listView"
+                  SelectionChanged="listView_SelectionChanged"
+                  AutomationProperties.Name="失效网址列表">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Width="60" Header="删除" AutomationProperties.Name="删除列">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox HorizontalAlignment="Center"
+                                          IsChecked="{Binding Delete, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          AutomationProperties.Name="是否删除"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn Width="240" Header="站点名称" DisplayMemberBinding="{Binding Title}"
+                                    AutomationProperties.Name="站点名称列"/>
+                    <GridViewColumn Width="220" Header="网址" DisplayMemberBinding="{Binding Url}"
+                                    AutomationProperties.Name="网址列"/>
+                    <GridViewColumn Width="180" Header="失效原因" DisplayMemberBinding="{Binding Reason}"
+                                    AutomationProperties.Name="失效原因列"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+    </DockPanel>
+</Window>

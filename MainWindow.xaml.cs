@@ -3398,8 +3398,7 @@ public partial class MainWindow : Window
         {
             if (dialog.ImportedUrls.Count > 0)
             {
-                // 登记每条导入网址所属的文件夹路径（含所有祖先路径），
-                // 以便分类树按层级展示导入的书签文件夹结构。
+                // 1) 先登记所有导入网址与分类
                 foreach (var url in dialog.ImportedUrls)
                 {
                     _urlData.Entries.Add(url);
@@ -3408,7 +3407,16 @@ public partial class MainWindow : Window
 
                 StorageService.SaveUrls(_urlData);
                 RefreshTree(); RefreshList();
-                Announce($"已导入 {dialog.ImportedUrls.Count} 条网址。");
+                var totalMsg = dialog.BookmarkResult is null
+                    ? $"已导入 {dialog.ImportedUrls.Count} 条网址。"
+                    : $"共解析 {dialog.BookmarkResult.TotalScanned}，成功 {dialog.ImportedUrls.Count}，跳过 {dialog.BookmarkResult.Failures.Count}。";
+                Announce(totalMsg);
+
+                // 2) 若勾选了"导入后检测失效"，则跑健康检查 → 失效列表选择删除
+                if (dialog.WantsHealthCheck)
+                {
+                    _ = RunImportHealthCheckFlowAsync(dialog.ImportedUrls);
+                }
             }
 
             if (dialog.ImportedPasswords.Count > 0 && EnsureUnlocked())
@@ -3423,6 +3431,65 @@ public partial class MainWindow : Window
             }
         }
         RestoreFocus(previous);
+    }
+
+    /// <summary>
+    /// 导入完成后的流程：
+    ///   显示检测进度对话框（并发）→ 收集失效 → 弹出选择删除对话框 → 删除勾选条目。
+    /// </summary>
+    private async Task RunImportHealthCheckFlowAsync(List<UrlEntry> importedEntries)
+    {
+        // 允许 UI 在 DoImport 恢复焦点后再进入模态检测对话框
+        await Task.Yield();
+        try
+        {
+            var workingCopy = importedEntries.ToList();
+
+            var progressDlg = new HealthCheckProgressDialog(workingCopy) { Owner = this };
+            _ = progressDlg.ShowDialog();
+            var broken = progressDlg.DetectedBrokenEntries;
+
+            if (broken.Count == 0)
+            {
+                Announce($"检测完成：{workingCopy.Count} 条均未发现失效。");
+                // 仍要保存健康检查字段（LastCheckedTime / LastCheckStatus）
+                StorageService.SaveUrls(_urlData);
+                RefreshList();
+                return;
+            }
+
+            Announce($"已检测到 {broken.Count} 条可疑失效网址，正在打开确认列表…");
+            var chooseDlg = new BrokenUrlDialog(broken) { Owner = this };
+            var confirm = chooseDlg.ShowDialog() == true;
+            var toDelete = chooseDlg.SelectedIds;
+
+            if (!confirm || toDelete.Count == 0)
+            {
+                StorageService.SaveUrls(_urlData);
+                RefreshList();
+                Announce("您选择全部保留，未删除任何条目。");
+                return;
+            }
+
+            // 按 Id 删除
+            var removedCount = 0;
+            for (var i = _urlData.Entries.Count - 1; i >= 0; i--)
+            {
+                if (toDelete.Contains(_urlData.Entries[i].Id))
+                {
+                    _urlData.Entries.RemoveAt(i);
+                    removedCount++;
+                }
+            }
+
+            StorageService.SaveUrls(_urlData);
+            RefreshTree(); RefreshList();
+            Announce($"已删除 {removedCount} 条失效网址，剩余导入 {Math.Max(0, importedEntries.Count - removedCount)} 条。");
+        }
+        catch (Exception ex)
+        {
+            Announce("失效检测过程出错：" + ex.Message);
+        }
     }
 
     private void DoCategoryManager()

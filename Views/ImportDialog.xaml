@@ -1,9 +1,9 @@
 <Window x:Class="BlindNotepad.ImportDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="导入数据" Height="420" Width="540"
+        Title="导入数据" Height="520" Width="580"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
-        ResizeMode="CanResize" MinHeight="380" MinWidth="500"
+        ResizeMode="CanResize" MinHeight="460" MinWidth="540"
         FocusManager.FocusedElement="{Binding ElementName=urlImportRadio}"
         PreviewKeyDown="Window_PreviewKeyDown">
     <Grid Margin="12">
@@ -11,23 +11,43 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <StackPanel Grid.Row="0" Margin="0,0,0,8">
-            <RadioButton x:Name="urlImportRadio" Content="导入网址（浏览器书签 HTML）" Margin="0,4" IsChecked="True" AutomationProperties.Name="导入网址"/>
-            <RadioButton x:Name="passwordImportRadio" Content="导入密码（CSV 格式）" Margin="0,4" AutomationProperties.Name="导入密码"/>
+            <RadioButton x:Name="urlImportRadio" Content="导入网址（浏览器书签 HTML）" Margin="0,4" IsChecked="True" AutomationProperties.Name="导入网址" Unchecked="UrlImportRadio_Changed"/>
+            <RadioButton x:Name="passwordImportRadio" Content="导入密码（CSV 格式）" Margin="0,4" AutomationProperties.Name="导入密码" Unchecked="UrlImportRadio_Changed"/>
         </StackPanel>
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
-            <TextBox x:Name="filePathBox" Width="360" IsReadOnly="True" AutomationProperties.Name="文件路径"/>
+            <TextBox x:Name="filePathBox" Width="400" IsReadOnly="True" AutomationProperties.Name="文件路径"/>
             <Button Content="浏览(_B)" Margin="8,0,0,0" Padding="12,4" Click="OnBrowse" AutomationProperties.Name="浏览文件"/>
         </StackPanel>
-        <Button Grid.Row="2" x:Name="importButton" Content="导入(_I)" Padding="20,4" HorizontalAlignment="Left" Margin="0,0,0,8" Click="OnImport" AutomationProperties.Name="执行导入"/>
-        <TextBox Grid.Row="3" x:Name="resultBox" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-                 AutomationProperties.Name="导入结果"/>
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+        <GroupBox Grid.Row="2" x:Name="urlOptionsGroup" Header="网址导入选项" Margin="0,0,0,8">
+            <StackPanel Margin="8,4,8,8">
+                <CheckBox x:Name="flatFolderCheck" Content="全部导入到同一个文件夹（忽略原书签层级）" Margin="0,2,0,2"
+                          Unchecked="FlatFolderCheck_Changed" Checked="FlatFolderCheck_Changed"
+                          AutomationProperties.Name="全部导入到同一个文件夹"/>
+                <DockPanel Margin="20,2,0,2">
+                    <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" Text="文件夹路径：" Margin="0,0,8,0"
+                               AutomationProperties.Name="文件夹路径标签"/>
+                    <TextBox x:Name="flatFolderBox" VerticalAlignment="Center" AutomationProperties.Name="文件夹路径输入框"
+                             Text="导入"/>
+                </DockPanel>
+                <CheckBox x:Name="healthCheckAfterImportCheck" Content="导入后自动检测失效网址（导入完成后弹出确认）"
+                          IsChecked="True" Margin="0,4,0,2" AutomationProperties.Name="导入后检测失效网址"/>
+            </StackPanel>
+        </GroupBox>
+        <Button Grid.Row="3" x:Name="importButton" Content="导入(_I)" Padding="20,4" HorizontalAlignment="Left" Margin="0,0,0,8" Click="OnImport" AutomationProperties.Name="执行导入"/>
+        <TextBlock Grid.Row="4" x:Name="summaryText" Margin="0,0,0,4" TextWrapping="Wrap"
+                   AutomationProperties.Name="导入汇总"/>
+        <TextBox Grid.Row="5" x:Name="resultBox" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                 AutomationProperties.Name="导入结果详情"/>
+        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button x:Name="okButton" Content="确定(_O)" Padding="20,4" Margin="0,0,8,0" Click="OnOk" IsEnabled="False" AutomationProperties.Name="确认导入结果"/>
             <Button Content="关闭(_C)" Padding="20,4" IsCancel="True" AutomationProperties.Name="关闭"/>
         </StackPanel>
     </Grid>
 </Window>
+

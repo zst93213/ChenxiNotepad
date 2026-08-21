@@ -1,0 +1,27 @@
+<Window x:Class="BlindNotepad.HealthCheckProgressDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="正在检测失效网址"
+        Height="260" Width="520"
+        MinWidth="420" MinHeight="220"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        Loaded="Window_Loaded">
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top" x:Name="stageText" FontWeight="Bold"
+                   AutomationProperties.Name="当前阶段"/>
+        <TextBlock DockPanel.Dock="Top" x:Name="detailText" Margin="0,4,0,4" TextWrapping="Wrap"
+                   AutomationProperties.Name="详细进度"/>
+        <ProgressBar DockPanel.Dock="Top" x:Name="progressBar" Height="16" Margin="0,8,0,4"
+                     AutomationProperties.Name="进度条"/>
+        <TextBlock DockPanel.Dock="Top" x:Name="percentText" AutomationProperties.Name="百分比"/>
+        <TextBlock DockPanel.Dock="Top" x:Name="countText" Margin="0,4,0,8"
+                   AutomationProperties.Name="完成数统计"/>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="cancelButton" Content="取消检测(_C)" Padding="20,4" Click="OnCancel"
+                    AutomationProperties.Name="取消检测"/>
+        </StackPanel>
+    </DockPanel>
+</Window>
