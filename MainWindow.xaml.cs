@@ -708,8 +708,7 @@ public partial class MainWindow : Window
         if (_currentModule == Module.Url)
         {
             categoryTree.Items.Add(MakeTreeNode("全部网址", null));
-            foreach (var category in _urlData.Categories)
-                categoryTree.Items.Add(MakeTreeNode(category, category));
+            BuildUrlCategoryTreeNodes();
         }
         else if (_currentModule == Module.Snippet)
         {
@@ -791,6 +790,48 @@ public partial class MainWindow : Window
         return node;
     }
 
+    /// <summary>
+    /// 把 _urlData.Categories（支持 "/" 分隔的路径）构建成层级树节点，加到 categoryTree 顶层。
+    /// 每个节点的 Tag 为完整路径，供筛选时使用。祖先路径不在 Categories 中时也会作为中间节点创建。
+    /// </summary>
+    private void BuildUrlCategoryTreeNodes()
+    {
+        var sortedPaths = _urlData.Categories
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .OrderBy(c => c, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        // 路径 -> 节点 的映射（不区分大小写，避免重复创建）
+        var nodeMap = new Dictionary<string, TreeViewItem>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var path in sortedPaths)
+        {
+            var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (segments.Length == 0) continue;
+
+            var currentPath = "";
+            TreeViewItem? parentNode = null;
+
+            for (var i = 0; i < segments.Length; i++)
+            {
+                currentPath = i == 0 ? segments[i] : currentPath + "/" + segments[i];
+
+                if (!nodeMap.TryGetValue(currentPath, out var node))
+                {
+                    node = MakeTreeNode(segments[i], currentPath);
+                    if (parentNode is null)
+                        categoryTree.Items.Add(node);
+                    else
+                        parentNode.Items.Add(node);
+                    nodeMap[currentPath] = node;
+                    // 默认展开，方便键盘浏览
+                    node.IsExpanded = true;
+                }
+                parentNode = node;
+            }
+        }
+    }
+
     private void OnCategorySelected(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         _currentFilter = categoryTree.SelectedItem is TreeViewItem node ? node.Tag as string : null;
@@ -816,7 +857,9 @@ public partial class MainWindow : Window
         {
             urlListBox.Items.Clear();
             _filteredUrls = _urlData.Entries
-                .Where(u => _currentFilter is null || u.Category == _currentFilter)
+                .Where(u => _currentFilter is null
+                            || u.Category == _currentFilter
+                            || u.Category.StartsWith(_currentFilter + "/", StringComparison.Ordinal))
                 .Where(u => string.IsNullOrEmpty(search)
                             || u.Title.Contains(search, StringComparison.OrdinalIgnoreCase)
                             || u.Url.Contains(search, StringComparison.OrdinalIgnoreCase)
@@ -1013,6 +1056,7 @@ public partial class MainWindow : Window
         menu.Items.Add(MakeMenuItem("复制密钥", "复制密钥到剪贴板", (_, _) => DoCopySecret()));
         menu.Items.Add(new Separator());
         menu.Items.Add(MakeMenuItem("克隆", "复制此网址条目（含账号/密钥等全部信息）", (_, _) => DoCloneUrl(), "Ctrl+Shift+D"));
+        menu.Items.Add(MakeMenuItem("移动到文件夹", "把此网址条目移动到其它文件夹", (_, _) => MoveUrlToFolder()));
         menu.Items.Add(MakeMenuItem("自定义显示", "打开字段显示/隐藏配置窗口", (_, _) => DoCustomizeUrlFields()));
         menu.Items.Add(new Separator());
         menu.Items.Add(MakeMenuItem("切换收藏", "切换收藏置顶", (_, _) => DoToggleFavorite(), "Ctrl+Shift+F"));
@@ -1531,7 +1575,14 @@ public partial class MainWindow : Window
         // 通用快捷键
         if (ctrl && !shift && e.Key == Key.F) { e.Handled = true; DoSearch(); return; }
         if (ctrl && !shift && e.Key == Key.S) { e.Handled = true; DoSave(); return; }
-        if (ctrl && !shift && e.Key == Key.N) { e.Handled = true; DoNew(); return; }
+        if (ctrl && !shift && e.Key == Key.N)
+        {
+            e.Handled = true;
+            // 网址模块：Ctrl+N 弹出"新建网址条目 / 新建文件夹"二选一菜单
+            if (_currentModule == Module.Url) ShowUrlNewMenu();
+            else DoNew();
+            return;
+        }
         if (ctrl && !shift && e.Key == Key.E) { e.Handled = true; DoEdit(); return; }
         if (ctrl && !shift && e.Key == Key.D) { e.Handled = true; DoDelete(); return; }
 
@@ -1949,6 +2000,68 @@ public partial class MainWindow : Window
 
     // ---- 网址增删改 ----
 
+    /// <summary>Ctrl+N 在网址模块弹出"新建网址条目 / 新建文件夹"二选一菜单。</summary>
+    private void ShowUrlNewMenu()
+    {
+        var menu = new ContextMenu();
+        menu.Items.Add(MakeMenuItem("新建网址条目", "新建一个网址收藏条目", (_, _) => NewUrl(), "Ctrl+N"));
+        menu.Items.Add(MakeMenuItem("新建文件夹", "新建一个网址收藏文件夹（可用 / 表示层级）", (_, _) => NewUrlFolder()));
+        menu.Placement = PlacementMode.MousePoint;
+        menu.IsOpen = true;
+        _a11y.Announce(this, "新建菜单：新建网址条目，或新建文件夹。");
+    }
+
+    /// <summary>新建一个网址收藏文件夹（仅创建文件夹，不创建网址条目）。</summary>
+    private void NewUrlFolder()
+    {
+        var previous = CaptureFocus();
+        var dialog = new UrlFolderDialog(
+            _urlData.Categories,
+            "新建文件夹",
+            "输入新文件夹名（可用 / 表示层级，如 导入/学习）。上下光标可查看已有文件夹。回车确认，Esc 取消。",
+            _currentFilter)
+        { Owner = this };
+
+        if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.Result))
+        {
+            var path = dialog.Result!;
+            EnsureCategoryExists(path);
+            StorageService.SaveUrls(_urlData);
+            RefreshTree(); RefreshList();
+            Announce($"已新建文件夹：{path}。");
+        }
+        else Announce("已取消新建文件夹。");
+        RestoreFocus(previous);
+    }
+
+    /// <summary>把当前选中的网址条目移动到指定文件夹。</summary>
+    private void MoveUrlToFolder()
+    {
+        var entry = GetSelectedUrl();
+        if (entry is null) { Announce("请先选中要移动的网址。"); return; }
+
+        var previous = CaptureFocus();
+        var dialog = new UrlFolderDialog(
+            _urlData.Categories,
+            "移动到文件夹",
+            "选择目标文件夹，或输入新文件夹名（可用 / 表示层级）。回车确认，Esc 取消。",
+            entry.Category)
+        { Owner = this };
+
+        if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.Result))
+        {
+            var target = dialog.Result!;
+            entry.Category = target;
+            entry.ModifiedTime = DateTime.Now;
+            EnsureCategoryExists(target);
+            StorageService.SaveUrls(_urlData);
+            RefreshTree(); RefreshList(); SelectUrlById(entry.Id);
+            Announce($"已移动到文件夹：{target}。");
+        }
+        else Announce("已取消移动。");
+        RestoreFocus(previous);
+    }
+
     private void NewUrl()
     {
         var previous = CaptureFocus();
@@ -2059,8 +2172,20 @@ public partial class MainWindow : Window
 
     private void EnsureCategoryExists(string? category)
     {
-        if (!string.IsNullOrWhiteSpace(category) && !_urlData.Categories.Contains(category))
-            _urlData.Categories.Add(category);
+        if (string.IsNullOrWhiteSpace(category))
+            return;
+
+        // 支持 "/" 分隔的文件夹路径：把每一级祖先路径都登记到分类列表，
+        // 这样分类树能正确展示层级（例如 "导入/学习/编程" 会同时登记
+        // "导入"、"导入/学习"、"导入/学习/编程"）。
+        var parts = category.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var current = "";
+        foreach (var part in parts)
+        {
+            current = string.IsNullOrEmpty(current) ? part : current + "/" + part;
+            if (!_urlData.Categories.Contains(current))
+                _urlData.Categories.Add(current);
+        }
     }
 
     private void SelectUrlById(string id)
@@ -3273,11 +3398,13 @@ public partial class MainWindow : Window
         {
             if (dialog.ImportedUrls.Count > 0)
             {
-                if (_urlData.Categories.Contains("导入") == false)
-                    _urlData.Categories.Add("导入");
-
+                // 登记每条导入网址所属的文件夹路径（含所有祖先路径），
+                // 以便分类树按层级展示导入的书签文件夹结构。
                 foreach (var url in dialog.ImportedUrls)
+                {
                     _urlData.Entries.Add(url);
+                    EnsureCategoryExists(url.Category);
+                }
 
                 StorageService.SaveUrls(_urlData);
                 RefreshTree(); RefreshList();

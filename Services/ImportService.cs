@@ -16,8 +16,10 @@ public static class ImportService
     };
 
     /// <summary>
-    /// 从 Netscape 格式书签 HTML 文件导入网址。
-    /// 返回导入的 UrlEntry 列表。
+    /// 从 Netscape 格式书签 HTML 文件导入网址，并保留原书签的文件夹层级结构。
+    /// 文件夹通过 &lt;H3&gt; 标题声明、&lt;DL&gt;...&lt;/DL&gt; 包裹子项表达层级。
+    /// 导入后的 Category 为路径字符串，以 "/" 分隔（例如 "导入/学习/编程"），
+    /// 便于在分类树中按层级展示。无文件夹归属的书签归入 "导入"。
     /// </summary>
     public static List<UrlEntry> ImportBookmarks(string filePath)
     {
@@ -30,26 +32,67 @@ public static class ImportService
 
             var html = File.ReadAllText(filePath);
 
-            // 匹配 <A HREF="url">title</A> 格式
-            var regex = new System.Text.RegularExpressions.Regex(
-                @"<A\s+HREF=""([^""]+)""[^>]*>([^<]*)</A>",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            // 按出现顺序匹配四种 token：
+            //   1) 文件夹标题 <H3 ...>name</H3>
+            //   2) 列表闭合 </DL>
+            //   3) 列表开始 <DL ...>
+            //   4) 书签 <A HREF="url" ...>title</A>
+            // 闭合标签放在开始标签之前，避免 <DL[^>]*> 误匹配。
+            var tokenRegex = new System.Text.RegularExpressions.Regex(
+                @"<H3[^>]*>(.*?)</H3>|</DL\s*>|<DL[^>]*>|<A\s+[^>]*?HREF\s*=\s*""([^""]+)""[^>]*>(.*?)</A>",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                | System.Text.RegularExpressions.RegexOptions.Singleline);
 
-            foreach (System.Text.RegularExpressions.Match match in regex.Matches(html))
+            // 文件夹路径栈：每一层可能为 null（根容器，不贡献路径段）
+            var folderStack = new List<string?>();
+            string? pendingFolder = null;
+            const string rootName = "导入";
+
+            foreach (System.Text.RegularExpressions.Match match in tokenRegex.Matches(html))
             {
-                var url = match.Groups[1].Value.Trim();
-                var title = match.Groups[2].Value.Trim();
+                var value = match.Value;
+                var isClose = value.StartsWith("</DL", StringComparison.OrdinalIgnoreCase);
+                var isOpen = !isClose && value.StartsWith("<DL", StringComparison.OrdinalIgnoreCase);
+                var isH3 = value.StartsWith("<H3", StringComparison.OrdinalIgnoreCase);
+                var isAnchor = value.StartsWith("<A", StringComparison.OrdinalIgnoreCase) && match.Groups[2].Success;
 
-                if (!string.IsNullOrEmpty(url) && !string.IsNullOrEmpty(title))
+                if (isH3)
                 {
-                    results.Add(new UrlEntry
+                    // 记录待压栈的文件夹名，等遇到下一个 <DL> 时压入
+                    pendingFolder = DecodeHtml(match.Groups[1].Value);
+                }
+                else if (isOpen)
+                {
+                    folderStack.Add(pendingFolder);
+                    pendingFolder = null;
+                }
+                else if (isClose)
+                {
+                    if (folderStack.Count > 0)
+                        folderStack.RemoveAt(folderStack.Count - 1);
+                    pendingFolder = null;
+                }
+                else if (isAnchor)
+                {
+                    var url = match.Groups[2].Value.Trim();
+                    var title = DecodeHtml(match.Groups[3].Value);
+
+                    if (!string.IsNullOrEmpty(url) && !string.IsNullOrEmpty(title))
                     {
-                        Title = title,
-                        Url = url,
-                        Category = "导入",
-                        CreatedTime = DateTime.Now,
-                        ModifiedTime = DateTime.Now
-                    });
+                        // 构造完整路径：rootName + 各层非 null 文件夹名
+                        var path = new List<string> { rootName };
+                        foreach (var f in folderStack)
+                            if (!string.IsNullOrEmpty(f)) path.Add(f);
+
+                        results.Add(new UrlEntry
+                        {
+                            Title = title,
+                            Url = url,
+                            Category = string.Join("/", path),
+                            CreatedTime = DateTime.Now,
+                            ModifiedTime = DateTime.Now
+                        });
+                    }
                 }
             }
         }
@@ -59,6 +102,19 @@ public static class ImportService
         }
 
         return results;
+    }
+
+    /// <summary>解码 Netscape 书签 HTML 中的常见实体并去除首尾空白。</summary>
+    private static string DecodeHtml(string? s)
+    {
+        if (string.IsNullOrEmpty(s)) return string.Empty;
+        return s.Replace("&amp;", "&")
+                .Replace("&lt;", "<")
+                .Replace("&gt;", ">")
+                .Replace("&quot;", "\"")
+                .Replace("&#39;", "'")
+                .Replace("&nbsp;", " ")
+                .Trim();
     }
 
     /// <summary>
